@@ -24,6 +24,7 @@ add_executable(tanks
     code/defer.hpp
     code/renderer.hpp
     code/renderer.cpp
+    code/opengl.hpp
     ${PLATFORM_FILES}
 )
 

@@ -13,7 +13,7 @@
 
 namespace core {
 	static constexpr const char* Window_Class_Name = "CustomWindowClass";
-	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
+	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_MINIMIZEBOX | WS_SIZEBOX | WS_VISIBLE;
 	static constexpr int Array_End_Marker = 0;
 
 	struct Platform_Windows_Data {
@@ -21,14 +21,25 @@ namespace core {
 		HDC dc;
 		HGLRC ctx;
 		bool window_closed;
+		bool window_resized;
+		Dimensions window_client_dims;
 		bool window_class_initialized;
 	};
 
 	static LRESULT CALLBACK window_proc(HWND window,UINT msg,WPARAM wparam,LPARAM lparam) {
+		Platform_Windows_Data* data = reinterpret_cast<Platform_Windows_Data*>(GetWindowLongPtrA(window,0));
 		switch(msg) {
 			case WM_CLOSE: {
-				Platform_Windows_Data* data = reinterpret_cast<Platform_Windows_Data*>(GetWindowLongPtrA(window,0));
 				data->window_closed = true;
+				return 0;
+			}
+			case WM_SIZE: {
+				if(data) {
+					RECT rect = {};
+					GetClientRect(window,&rect);
+					data->window_client_dims = {std::uint32_t(rect.right),std::uint32_t(rect.bottom)};
+					data->window_resized = true;
+				}
 				return 0;
 			}
 		}
@@ -36,7 +47,7 @@ namespace core {
 	}
 
 	Platform::Platform() noexcept : data_buffer() {
-		static_assert(sizeof(Platform_Windows_Data) <= sizeof(Platform::data_buffer));
+		static_assert(sizeof(Platform_Windows_Data) <= sizeof(data_buffer));
 		SetConsoleOutputCP(CP_UTF8);
 		new(data_buffer) Platform_Windows_Data();
 	}
@@ -120,7 +131,7 @@ namespace core {
 		return wglCreateContextAttribsARB(data.dc,nullptr,context_attributes);
 	}
 
-	void Platform::create_main_window(std::string_view title,std::size_t width,std::size_t height) {
+	void Platform::create_main_window(const char* title,std::uint32_t width,std::uint32_t height) {
 		Platform_Windows_Data& data = *std::launder(reinterpret_cast<Platform_Windows_Data*>(data_buffer));
 		if(!data.window_class_initialized) {
 			WNDCLASSEXA wc = {};
@@ -135,15 +146,16 @@ namespace core {
 			data.window_class_initialized = true;
 		}
 
+		data.window_client_dims = {width,height};
 		RECT client_rect = {0,0,LONG(width),LONG(height)};
-		if(!AdjustWindowRect(&client_rect,Window_Flags,false)) throw Runtime_Exception("Couldn't adjust client rect dimensions.");
-		width = std::size_t(client_rect.right - client_rect.left);
-		height = std::size_t(client_rect.bottom - client_rect.top);
+		if(!AdjustWindowRect(&client_rect,Window_Flags,FALSE)) throw Runtime_Exception("Couldn't adjust client rect dimensions.");
+		width = std::uint32_t(client_rect.right - client_rect.left);
+		height = std::uint32_t(client_rect.bottom - client_rect.top);
 
-		data.window = CreateWindowExA(0,Window_Class_Name,title.data(),Window_Flags,CW_USEDEFAULT,CW_USEDEFAULT,int(width),int(height),HWND_DESKTOP,nullptr,GetModuleHandleA(nullptr),nullptr);
+		data.window = CreateWindowExA(0,Window_Class_Name,title,Window_Flags,CW_USEDEFAULT,CW_USEDEFAULT,int(width),int(height),HWND_DESKTOP,nullptr,GetModuleHandleA(nullptr),nullptr);
 		if(!data.window) throw Runtime_Exception("Couldn't create a window.");
 		data.window_closed = false;
-
+		
 		data.dc = GetDC(data.window);
 		if(!data.dc) throw Runtime_Exception("Couldn't get window DC.");
 
@@ -179,7 +191,19 @@ OPENGL_FUNC_LIST(OPENGL_LOAD_FUNC)
 		return data.window_closed;
 	}
 
+	bool Platform::window_resized() noexcept {
+		Platform_Windows_Data& data = *std::launder(reinterpret_cast<Platform_Windows_Data*>(data_buffer));
+		return data.window_resized;
+	}
+
+	Dimensions Platform::window_client_dimensions() noexcept {
+		Platform_Windows_Data& data = *std::launder(reinterpret_cast<Platform_Windows_Data*>(data_buffer));
+		return data.window_client_dims;
+	}
+
 	void Platform::process_events() {
+		Platform_Windows_Data& data = *std::launder(reinterpret_cast<Platform_Windows_Data*>(data_buffer));
+		data.window_resized = false;
 		MSG msg = {};
 		while(PeekMessageA(&msg,nullptr,0,0,PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -192,7 +216,7 @@ OPENGL_FUNC_LIST(OPENGL_LOAD_FUNC)
 		SwapBuffers(data.dc);
 	}
 
-	void Platform::error_message_box(std::string_view title) {
-		MessageBoxA(nullptr,title.data(),"Error!",MB_OK | MB_ICONERROR);
+	void Platform::error_message_box(const char* title) {
+		MessageBoxA(nullptr,title,"Error!",MB_OK | MB_SYSTEMMODAL | MB_ICONERROR);
 	}
 }
