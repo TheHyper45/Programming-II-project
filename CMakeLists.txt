@@ -9,7 +9,18 @@ endif()
 
 project(project_tanks LANGUAGES CXX)
 
-add_executable(tanks code/main.cpp)
+if(WIN32)
+    set(PLATFORM_FILES code/platform_windows.cpp)
+else()
+    set(PLATFORM_FILES code/platform_linux.cpp)
+endif()
+
+add_executable(tanks
+    code/main.cpp
+    code/platform.hpp
+    code/exceptions.hpp
+    ${PLATFORM_FILES}
+)
 
 target_compile_features(tanks PRIVATE cxx_std_20)
 set_target_properties(tanks PROPERTIES LINKER_LANGUAGE CXX)
