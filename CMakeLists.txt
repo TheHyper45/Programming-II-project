@@ -10,7 +10,7 @@ endif()
 project(project_tanks LANGUAGES CXX)
 
 if(WIN32)
-    set(PLATFORM_FILES code/platform_windows.cpp)
+    set(PLATFORM_FILES code/platform_windows.cpp code/wglext.h)
 else()
     set(PLATFORM_FILES code/platform_linux.cpp)
 endif()
@@ -19,6 +19,11 @@ add_executable(tanks
     code/main.cpp
     code/platform.hpp
     code/exceptions.hpp
+    code/khrplatform.h
+    code/glcorearb.h
+    code/defer.hpp
+    code/renderer.hpp
+    code/renderer.cpp
     ${PLATFORM_FILES}
 )
 
@@ -33,9 +38,11 @@ if(MSVC)
                                            VS_DEBUGGER_ENVIRONMENT "PATH=%PATH%;${CMAKE_PREFIX_PATH}/bin")
     target_compile_options(tanks PRIVATE /utf-8 /W4 /Wall /MP /permissive- /Zc:preprocessor)
     file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/.editorconfig DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    target_link_libraries(tanks PRIVATE OpenGL32.lib)
 elseif(MINGW)
     target_compile_definitions(tanks PRIVATE __USE_MINGW_ANSI_STDIO=1)
     target_compile_options(tanks PRIVATE -Wall -Wextra -Wconversion -Wshadow -Wno-missing-field-initializers -Wcast-align=strict -pedantic)
+    target_link_libraries(tanks PRIVATE OpenGL32.lib)
 else()
     target_compile_options(tanks PRIVATE -Wall -Wextra -Wconversion -Wshadow -Wno-missing-field-initializers -Wcast-align=strict -pedantic)
 endif()

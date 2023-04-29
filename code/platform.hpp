@@ -12,7 +12,7 @@ namespace core {
 		void create_main_window(std::string_view title,std::size_t width,std::size_t height);
 		[[nodiscard]] bool window_closed() noexcept;
 		void process_events();
-		void swap_buffers();
+		void swap_window_buffers();
 		void error_message_box(std::string_view title);
 	private:
 		alignas(std::max_align_t) unsigned char data_buffer[64];
