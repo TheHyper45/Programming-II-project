@@ -32,6 +32,12 @@ int main() {
             if(platform.is_key_down(core::Keycode::A)) {
                 std::cout << "A" << std::endl;
             }
+            if(platform.is_key_down(core::Keycode::Mouse_Left)) {
+                std::cout << "Left mouse" << std::endl;
+            }
+            if(platform.was_key_pressed(core::Keycode::Mouse_Right)) {
+                std::cout << "Right mouse" << std::endl;
+            }
 
             renderer.begin(0.0f,0.0f,0.0f,texture);
             renderer.end();

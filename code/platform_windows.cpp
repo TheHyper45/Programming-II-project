@@ -5,6 +5,7 @@
 	#define NOMINMAX
 #endif
 #include <Windows.h>
+#include <Windowsx.h>
 #include "defer.hpp"
 #include "opengl.hpp"
 #include "wglext.h"
@@ -32,9 +33,9 @@ namespace core {
 		bool window_closed;
 		bool window_resized;
 		Dimensions window_client_dims;
-		bool window_class_initialized;
 		bool key_down_statuses[std::size_t(Keycode::Num_Keycodes)];
 		bool was_key_pressed_statuses[std::size_t(Keycode::Num_Keycodes)];
+		Point mouse_position;
 	};
 
 	[[nodiscard]] static Keycode vk_code_to_keycode(WORD vk_code) {
@@ -162,6 +163,52 @@ namespace core {
 				if(msg == WM_SYSKEYDOWN || msg == WM_SYSKEYUP) return DefWindowProcA(window,msg,wparam,lparam);
 				return 0;
 			}
+			case WM_LBUTTONDOWN:
+			case WM_MBUTTONDOWN:
+			case WM_RBUTTONDOWN:
+			case WM_XBUTTONDOWN: {
+				if((wparam & MK_LBUTTON) == MK_LBUTTON) {
+					data->was_key_pressed_statuses[std::size_t(Keycode::Mouse_Left)] = true;
+					data->key_down_statuses[std::size_t(Keycode::Mouse_Left)] = true;
+				}
+				if((wparam & MK_MBUTTON) == MK_MBUTTON) {
+					data->was_key_pressed_statuses[std::size_t(Keycode::Mouse_Middle)] = true;
+					data->key_down_statuses[std::size_t(Keycode::Mouse_Middle)] = true;
+				}
+				if((wparam & MK_RBUTTON) == MK_RBUTTON) {
+					data->was_key_pressed_statuses[std::size_t(Keycode::Mouse_Right)] = true;
+					data->key_down_statuses[std::size_t(Keycode::Mouse_Right)] = true;
+				}
+				if((wparam & MK_XBUTTON1) == MK_XBUTTON1) {
+					data->was_key_pressed_statuses[std::size_t(Keycode::Mouse_X1)] = true;
+					data->key_down_statuses[std::size_t(Keycode::Mouse_X1)] = true;
+				}
+				if((wparam & MK_XBUTTON2) == MK_XBUTTON2) {
+					data->was_key_pressed_statuses[std::size_t(Keycode::Mouse_X2)] = true;
+					data->key_down_statuses[std::size_t(Keycode::Mouse_X2)] = true;
+				}
+				return msg == WM_XBUTTONDOWN;
+			}
+			case WM_LBUTTONUP:
+			case WM_MBUTTONUP:
+			case WM_RBUTTONUP:
+			case WM_XBUTTONUP: {
+				if((wparam & MK_LBUTTON) != MK_LBUTTON)
+					data->key_down_statuses[std::size_t(Keycode::Mouse_Left)] = false;
+				if((wparam & MK_MBUTTON) != MK_MBUTTON)
+					data->key_down_statuses[std::size_t(Keycode::Mouse_Middle)] = false;
+				if((wparam & MK_RBUTTON) != MK_RBUTTON)
+					data->key_down_statuses[std::size_t(Keycode::Mouse_Right)] = false;
+				if((wparam & MK_XBUTTON1) != MK_XBUTTON1)
+					data->key_down_statuses[std::size_t(Keycode::Mouse_X1)] = false;
+				if((wparam & MK_XBUTTON2) != MK_XBUTTON2)
+					data->key_down_statuses[std::size_t(Keycode::Mouse_X2)] = false;
+				return msg == WM_XBUTTONUP;
+			}
+			case WM_MOUSEMOVE: {
+				data->mouse_position = {std::uint32_t(GET_X_LPARAM(lparam)),std::uint32_t(GET_Y_LPARAM(lparam))};
+				return 0;
+			}
 			case WM_CHAR: {
 				//std::cout << wparam << std::endl;
 				return 0;
@@ -257,20 +304,16 @@ namespace core {
 
 	void Platform::create_main_window(const char* title,std::uint32_t width,std::uint32_t height) {
 		Platform_Windows_Data& data = *std::launder(reinterpret_cast<Platform_Windows_Data*>(data_buffer));
-		if(!data.window_class_initialized) {
-			WNDCLASSEXA wc = {};
-			wc.cbSize = sizeof(wc);
-			wc.lpszClassName = Window_Class_Name;
-			wc.hInstance = GetModuleHandleA(nullptr);
-			wc.hIcon = LoadIconA(nullptr,IDI_APPLICATION);
-			wc.hIconSm = wc.hIcon;
-			wc.lpfnWndProc = &core::window_proc;
-			wc.cbWndExtra = sizeof(Platform_Windows_Data*) + sizeof(LONG_PTR);
-			if(!RegisterClassExA(&wc)) throw Runtime_Exception("Couldn't register window class.");
-			data.window_class_initialized = true;
-		}
+		WNDCLASSEXA wc = {};
+		wc.cbSize = sizeof(wc);
+		wc.lpszClassName = Window_Class_Name;
+		wc.hInstance = GetModuleHandleA(nullptr);
+		wc.hIcon = LoadIconA(nullptr,IDI_APPLICATION);
+		wc.hIconSm = wc.hIcon;
+		wc.lpfnWndProc = &core::window_proc;
+		wc.cbWndExtra = sizeof(Platform_Windows_Data*) + sizeof(LONG_PTR);
+		if(!RegisterClassExA(&wc)) throw Runtime_Exception("Couldn't register window class.");
 
-		data.window_client_dims = {width,height};
 		RECT client_rect = {0,0,LONG(width),LONG(height)};
 		if(!AdjustWindowRect(&client_rect,Window_Flags,FALSE)) throw Runtime_Exception("Couldn't adjust client rect dimensions.");
 		width = std::uint32_t(client_rect.right - client_rect.left);
@@ -279,6 +322,10 @@ namespace core {
 		data.window = CreateWindowExA(0,Window_Class_Name,title,Window_Flags,CW_USEDEFAULT,CW_USEDEFAULT,int(width),int(height),HWND_DESKTOP,nullptr,GetModuleHandleA(nullptr),nullptr);
 		if(!data.window) throw Runtime_Exception("Couldn't create a window.");
 		data.window_closed = false;
+
+		RECT rect = {};
+		GetClientRect(data.window,&rect);
+		data.window_client_dims = {std::uint32_t(rect.right),std::uint32_t(rect.bottom)};
 		
 		data.dc = GetDC(data.window);
 		if(!data.dc) throw Runtime_Exception("Couldn't get window DC.");
@@ -345,13 +392,18 @@ OPENGL_FUNC_LIST(OPENGL_LOAD_FUNC)
 		MessageBoxA(nullptr,title,"Error!",MB_OK | MB_SYSTEMMODAL | MB_ICONERROR);
 	}
 
-	[[nodiscard]] bool Platform::is_key_down(Keycode code) const noexcept {
+	bool Platform::is_key_down(Keycode code) const noexcept {
 		const Platform_Windows_Data& data = *std::launder(reinterpret_cast<const Platform_Windows_Data*>(data_buffer));
 		return data.key_down_statuses[std::size_t(code)];
 	}
 
-	[[nodiscard]] bool Platform::was_key_pressed(Keycode code) const noexcept {
+	bool Platform::was_key_pressed(Keycode code) const noexcept {
 		const Platform_Windows_Data& data = *std::launder(reinterpret_cast<const Platform_Windows_Data*>(data_buffer));
 		return data.was_key_pressed_statuses[std::size_t(code)];
+	}
+
+	Point Platform::mouse_position() const noexcept {
+		const Platform_Windows_Data& data = *std::launder(reinterpret_cast<const Platform_Windows_Data*>(data_buffer));
+		return data.mouse_position;
 	}
 }

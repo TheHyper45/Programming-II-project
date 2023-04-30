@@ -10,6 +10,11 @@ namespace core {
 		std::uint32_t height;
 	};
 
+	struct Point {
+		std::uint32_t x;
+		std::uint32_t y;
+	};
+
 #define CORE_KEYCODES(MACRO)\
 	MACRO(Unknown)\
 	MACRO(Num_0)\
@@ -132,7 +137,12 @@ namespace core {
 	MACRO(Oem8)\
 	MACRO(Chevrons)\
 	MACRO(Clear)\
-	MACRO(Capslock)
+	MACRO(Capslock)\
+	MACRO(Mouse_Left)\
+	MACRO(Mouse_Middle)\
+	MACRO(Mouse_Right)\
+	MACRO(Mouse_X1)\
+	MACRO(Mouse_X2)
 
 	enum struct Keycode : std::uint32_t {
 #define CORE_KEYCODES_ENUM_VALUE(NAME) NAME,
@@ -157,6 +167,7 @@ namespace core {
 		void error_message_box(const char* title);
 		[[nodiscard]] bool is_key_down(Keycode code) const noexcept;
 		[[nodiscard]] bool was_key_pressed(Keycode code) const noexcept;
+		[[nodiscard]] Point mouse_position() const noexcept;
 	private:
 		alignas(std::max_align_t) unsigned char data_buffer[512];
 	};
