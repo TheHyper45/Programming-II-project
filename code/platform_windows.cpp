@@ -38,6 +38,7 @@ namespace core {
 					RECT rect = {};
 					GetClientRect(window,&rect);
 					data->window_client_dims = {std::uint32_t(rect.right),std::uint32_t(rect.bottom)};
+					std::cout << data->window_client_dims.width << "," << data->window_client_dims.height << "\n";
 					data->window_resized = true;
 				}
 				return 0;
@@ -171,7 +172,7 @@ namespace core {
 		HMODULE opengl32_lib = LoadLibraryA("OpenGL32.dll");
 		if(!opengl32_lib) throw Runtime_Exception("Couldn't load OpenGL32.dll.");
 		defer[&]{FreeLibrary(opengl32_lib);};
-
+		
 #define OPENGL_LOAD_FUNC(TYPE,NAME) \
 	do {\
 		NAME = reinterpret_cast<TYPE>(wglGetProcAddress(#NAME));\

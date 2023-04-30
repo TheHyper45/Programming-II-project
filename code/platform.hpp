@@ -13,6 +13,8 @@ namespace core {
 	class Platform {
 	public:
 		Platform() noexcept;
+		Platform(const Platform&) = delete;
+		Platform& operator=(const Platform&) = delete;
 		~Platform();
 		void create_main_window(const char* title,std::uint32_t width,std::uint32_t height);
 		[[nodiscard]] bool window_closed() noexcept;
