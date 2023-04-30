@@ -38,6 +38,7 @@ if(MSVC)
                                            VS_DEBUGGER_COMMAND "$<TARGET_FILE:tanks>"
                                            VS_DEBUGGER_ENVIRONMENT "PATH=%PATH%;${CMAKE_PREFIX_PATH}/bin")
     target_compile_options(tanks PRIVATE /utf-8 /W4 /Wall /MP /permissive- /Zc:preprocessor)
+    target_link_options(tanks PRIVATE /MANIFEST:EMBED /MANIFESTINPUT:${CMAKE_SOURCE_DIR}/win32app.manifest)
     file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/.editorconfig DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
     target_link_libraries(tanks PRIVATE OpenGL32.lib)
 elseif(MINGW)

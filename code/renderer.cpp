@@ -127,12 +127,12 @@ namespace core {
 		glBindBuffer(GL_ARRAY_BUFFER,data.quad_buffer);
 
 		Vertex quad_data[] = {
-			{{-1.0f, 1.0f},{0.0f,0.0f}},
-			{{ 1.0f, 1.0f},{1.0f,0.0f}},
-			{{ 1.0f,-1.0f},{1.0f,1.0f}},
-			{{-1.0f, 1.0f},{0.0f,0.0f}},
-			{{ 1.0f,-1.0f},{1.0f,1.0f}},
-			{{-1.0f,-1.0f},{0.0f,1.0f}},
+			{{-0.5f, 0.5f},{0.0f,0.0f}},
+			{{ 0.5f, 0.5f},{1.0f,0.0f}},
+			{{ 0.5f,-0.5f},{1.0f,1.0f}},
+			{{-0.5f, 0.5f},{0.0f,0.0f}},
+			{{ 0.5f,-0.5f},{1.0f,1.0f}},
+			{{-0.5f,-0.5f},{0.0f,1.0f}},
 		};
 		glBufferData(GL_ARRAY_BUFFER,GLsizeiptr(sizeof(quad_data)),quad_data,GL_STATIC_DRAW);
 

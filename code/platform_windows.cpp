@@ -16,6 +16,15 @@ namespace core {
 	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_MINIMIZEBOX | WS_SIZEBOX | WS_VISIBLE;
 	static constexpr int Array_End_Marker = 0;
 
+	const char* keycode_to_string(Keycode code) {
+		switch(code) {
+#define CORE_KEYCODES_ENUM_CASE(NAME) case Keycode::NAME: return #NAME;
+			CORE_KEYCODES(CORE_KEYCODES_ENUM_CASE)
+#undef CORE_KEYCODES_ENUM_CASE
+		}
+		return "[Invalid]";
+	}
+
 	struct Platform_Windows_Data {
 		HWND window;
 		HDC dc;
@@ -24,7 +33,87 @@ namespace core {
 		bool window_resized;
 		Dimensions window_client_dims;
 		bool window_class_initialized;
+		bool key_down_statuses[std::size_t(Keycode::Num_Keycodes)];
+		bool was_key_pressed_statuses[std::size_t(Keycode::Num_Keycodes)];
 	};
+
+	[[nodiscard]] static Keycode vk_code_to_keycode(WORD vk_code) {
+		if(vk_code >= '0' && vk_code <= '9')
+			return Keycode(std::uint32_t(Keycode::Num_0) + (vk_code - '0'));
+		if(vk_code >= 'A' && vk_code <= 'Z')
+			return Keycode(std::uint32_t(Keycode::A) + (vk_code - 'A'));
+		if(vk_code >= VK_F1 && vk_code <= VK_F24)
+			return Keycode(std::uint32_t(Keycode::F1) + (vk_code - VK_F1));
+		if(vk_code >= VK_NUMPAD0 && vk_code <= VK_NUMPAD9)
+			return Keycode(std::uint32_t(Keycode::Numpad_0) + (vk_code - VK_NUMPAD0));
+
+		//@TODO: Figure out what these are.
+		if(vk_code >= 0x92 && vk_code <= 0x96)
+			return Keycode::Num_Keycodes;
+		if(vk_code == 0xE1)
+			return Keycode::Num_Keycodes;
+		if(vk_code >= 0xE3 && vk_code <= 0xE4)
+			return Keycode::Num_Keycodes;
+		if(vk_code == 0xE6)
+			return Keycode::Num_Keycodes;
+		if(vk_code >= 0xE9 && vk_code <= 0xF5)
+		   return Keycode::Num_Keycodes;
+
+		switch(vk_code) {
+			case VK_UP: return Keycode::Up;
+			case VK_DOWN: return Keycode::Down;
+			case VK_LEFT: return Keycode::Left;
+			case VK_RIGHT: return Keycode::Right;
+			case VK_SPACE: return Keycode::Space;
+			case VK_DELETE: return Keycode::Delete;
+			case VK_INSERT: return Keycode::Insert;
+			case VK_RETURN: return Keycode::Return;
+			case VK_BACK: return Keycode::Backspace;
+			case VK_LSHIFT: return Keycode::Left_Shift;
+			case VK_RSHIFT: return Keycode::Right_Shift;
+			case VK_LMENU: return Keycode::Left_Alt;
+			case VK_RMENU: return Keycode::Right_Alt;
+			case VK_LCONTROL: return Keycode::Left_Ctrl;
+			case VK_RCONTROL: return Keycode::Right_Ctrl;
+			case VK_LWIN: return Keycode::Left_Win;
+			case VK_RWIN: return Keycode::Right_Win;
+			case VK_TAB: return Keycode::Tab;
+			case VK_ESCAPE: return Keycode::Escape;
+			case VK_PRIOR: return Keycode::Page_Up;
+			case VK_NEXT: return Keycode::Page_Down;
+			case VK_END: return Keycode::End;
+			case VK_HOME: return Keycode::Home;
+			case VK_SELECT: return Keycode::Select;
+			case VK_PRINT: return Keycode::Print;
+			case VK_EXECUTE: return Keycode::Execute;
+			case VK_SNAPSHOT: return Keycode::Snapshot;
+			case VK_HELP: return Keycode::Help;
+			case VK_MULTIPLY: return Keycode::Multiply;
+			case VK_ADD: return Keycode::Add;
+			case VK_SEPARATOR: return Keycode::Separator;
+			case VK_SUBTRACT: return Keycode::Subtract;
+			case VK_DECIMAL: return Keycode::Decimal;
+			case VK_DIVIDE: return Keycode::Divide;
+			case VK_NUMLOCK: return Keycode::Numlock;
+			case VK_SCROLL: return Keycode::Scrolllock;
+			case VK_OEM_1: return Keycode::Semicolon;
+			case VK_OEM_PLUS: return Keycode::Plus;
+			case VK_OEM_COMMA: return Keycode::Comma;
+			case VK_OEM_MINUS: return Keycode::Minus;
+			case VK_OEM_PERIOD: return Keycode::Period;
+			case VK_OEM_2: return Keycode::Slash;
+			case VK_OEM_3: return Keycode::Grave;
+			case VK_OEM_4: return Keycode::Left_Bracket;
+			case VK_OEM_5: return Keycode::Backslash;
+			case VK_OEM_6: return Keycode::Right_Bracket;
+			case VK_OEM_7: return Keycode::Quote;
+			case VK_OEM_8: return Keycode::Oem8; //@TODO: Figure out what this is.
+			case VK_OEM_102: return Keycode::Chevrons;
+			case VK_OEM_CLEAR: return Keycode::Clear;
+			case VK_CAPITAL: return Keycode::Capslock;
+		}
+		return Keycode::Unknown;
+	}
 
 	static LRESULT CALLBACK window_proc(HWND window,UINT msg,WPARAM wparam,LPARAM lparam) {
 		Platform_Windows_Data* data = reinterpret_cast<Platform_Windows_Data*>(GetWindowLongPtrA(window,0));
@@ -38,9 +127,43 @@ namespace core {
 					RECT rect = {};
 					GetClientRect(window,&rect);
 					data->window_client_dims = {std::uint32_t(rect.right),std::uint32_t(rect.bottom)};
-					std::cout << data->window_client_dims.width << "," << data->window_client_dims.height << "\n";
 					data->window_resized = true;
 				}
+				return 0;
+			}
+			case WM_KEYDOWN:
+			case WM_SYSKEYDOWN:
+			case WM_KEYUP:
+			case WM_SYSKEYUP: {
+				WORD vk_code = LOWORD(wparam);
+				WORD key_flags = HIWORD(lparam);
+				BOOL was_key_down = (key_flags & KF_REPEAT) == KF_REPEAT;
+				BOOL is_key_released = (key_flags & KF_UP) == KF_UP;
+
+				if(vk_code == VK_SHIFT || vk_code == VK_CONTROL || vk_code == VK_MENU) {
+					WORD scan_code = LOBYTE(key_flags);
+					if((key_flags & KF_EXTENDED) == KF_EXTENDED) scan_code = MAKEWORD(scan_code,0xE0);
+					vk_code = LOWORD(MapVirtualKeyA(scan_code,MAPVK_VSC_TO_VK_EX));
+				}
+
+				auto keycode = core::vk_code_to_keycode(vk_code);
+				if(was_key_down == 0 && is_key_released == 0) {
+					data->was_key_pressed_statuses[std::size_t(keycode)] = true;
+					data->key_down_statuses[std::size_t(keycode)] = true;
+					//std::cout << "Keycode::" << core::keycode_to_string(keycode) << std::endl;
+				}
+				else if(was_key_down == 1 && is_key_released == 0) {
+					data->key_down_statuses[std::size_t(keycode)] = true;
+				}
+				else if(was_key_down == 1 && is_key_released == 1) {
+					data->key_down_statuses[std::size_t(keycode)] = false;
+				}
+
+				if(msg == WM_SYSKEYDOWN || msg == WM_SYSKEYUP) return DefWindowProcA(window,msg,wparam,lparam);
+				return 0;
+			}
+			case WM_CHAR: {
+				//std::cout << wparam << std::endl;
 				return 0;
 			}
 		}
@@ -204,6 +327,7 @@ OPENGL_FUNC_LIST(OPENGL_LOAD_FUNC)
 
 	void Platform::process_events() {
 		Platform_Windows_Data& data = *std::launder(reinterpret_cast<Platform_Windows_Data*>(data_buffer));
+		std::memset(data.was_key_pressed_statuses,0,sizeof(data.was_key_pressed_statuses));
 		data.window_resized = false;
 		MSG msg = {};
 		while(PeekMessageA(&msg,nullptr,0,0,PM_REMOVE)) {
@@ -219,5 +343,15 @@ OPENGL_FUNC_LIST(OPENGL_LOAD_FUNC)
 
 	void Platform::error_message_box(const char* title) {
 		MessageBoxA(nullptr,title,"Error!",MB_OK | MB_SYSTEMMODAL | MB_ICONERROR);
+	}
+
+	[[nodiscard]] bool Platform::is_key_down(Keycode code) const noexcept {
+		const Platform_Windows_Data& data = *std::launder(reinterpret_cast<const Platform_Windows_Data*>(data_buffer));
+		return data.key_down_statuses[std::size_t(code)];
+	}
+
+	[[nodiscard]] bool Platform::was_key_pressed(Keycode code) const noexcept {
+		const Platform_Windows_Data& data = *std::launder(reinterpret_cast<const Platform_Windows_Data*>(data_buffer));
+		return data.was_key_pressed_statuses[std::size_t(code)];
 	}
 }
