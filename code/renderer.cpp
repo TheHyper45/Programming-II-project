@@ -1,5 +1,7 @@
 #include <new>
+#include <cstdio>
 #include <vector>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -10,12 +12,25 @@
 #include "exceptions.hpp"
 
 namespace core {
+	static constexpr std::size_t Max_Simultaneous_Textures = 4;
 	static char info_log_buffer[4096];
+
+	struct Object_Data {
+		alignas(16) Mat4 transformation;
+		alignas(16) std::uint32_t texture_index;
+	};
 
 	struct Renderer_Internal_Data {
 		GLuint shader_program;
 		GLuint vertex_array;
-		GLuint quad_buffer;
+		GLuint quad_buffer_id;
+		std::size_t max_object_data_buffer_length;
+		GLuint object_data_buffer_id;
+		void* object_data_buffer_ptr;
+		std::size_t object_data_buffer_current_index;
+		std::size_t auto_texture_unit_index;
+		GLuint bound_texture_ids[Max_Simultaneous_Textures];
+		std::size_t bound_texture_ids_length;
 	};
 
 	Texture::Texture(Renderer* _renderer,std::uint32_t width,std::uint32_t height,const std::uint8_t* pixels) : renderer(_renderer),texture_id() {
@@ -36,24 +51,38 @@ namespace core {
 		glDeleteTextures(1,&texture_id);
 	}
 
-	static constexpr const char Vertex_Shader_Source[] = R"xxx(
+	static constexpr const char Vertex_Shader_Source_Format[] = R"xxx(
 		#version 420 core
-		in vec2 position;
+		in vec3 position;
 		in vec2 tex_coords;
 		out vec2 out_tex_coords;
+		out flat uint out_texture_index;
+		uniform mat4 matrix;
+		struct Object_Data {
+			mat4 transformation;
+			uint texture_index;
+		};
+		layout(std140) uniform Scene_Data {
+			Object_Data[%zu] object_datas;
+		};
 		void main() {
-			gl_Position = vec4(position,0.0,1.0);
+			gl_Position = matrix * object_datas[gl_InstanceID].transformation * vec4(position,1.0);
 			out_tex_coords = tex_coords;
+			out_texture_index = object_datas[gl_InstanceID].texture_index;
 		}
 	)xxx";
 
-	static constexpr const char Fragment_Shader_Source[] = R"xxx(
+	static constexpr const char Fragment_Shader_Source_Format[] = R"xxx(
 		#version 420 core
 		in vec2 out_tex_coords;
+		in flat uint out_texture_index;
 		out vec4 out_color;
-		uniform sampler2D tex0;
+		uniform sampler2D[%zu] texs;
 		void main() {
-			out_color = texture(tex0,out_tex_coords);
+			switch(out_texture_index) {
+				%s
+				default: out_color = vec4(1.0,1.0,1.0,1.0);
+			}
 		}
 	)xxx";
 
@@ -61,12 +90,21 @@ namespace core {
 		static_assert(sizeof(Renderer_Internal_Data) <= sizeof(data_buffer));
 		Renderer_Internal_Data& data = *new(data_buffer) Renderer_Internal_Data();
 
+		{
+			GLint64 desired_uniform_buffer_size = 65536;
+			GLint64 max_uniform_buffer_size = 0;
+			glGetInteger64v(GL_MAX_UNIFORM_BLOCK_SIZE,&max_uniform_buffer_size);
+			if(max_uniform_buffer_size < desired_uniform_buffer_size) desired_uniform_buffer_size = max_uniform_buffer_size;
+			data.max_object_data_buffer_length = desired_uniform_buffer_size / sizeof(Object_Data);
+		}
+
 		auto dims = platform->window_client_dimensions();
 		glViewport(0,0,dims.width,dims.height);
 
 		glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LEQUAL);
 		glDepthMask(GL_TRUE);
+		glClearDepth(1.0f);
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CW);
@@ -93,10 +131,27 @@ namespace core {
 		};
 
 		{
-			GLuint vertex_shader = create_shader(GL_VERTEX_SHADER,Vertex_Shader_Source,sizeof(Vertex_Shader_Source) - 1);
+			char shader_source[4096] = {};
+			int shader_source_byte_length = std::snprintf(shader_source,sizeof(shader_source) - 1,Vertex_Shader_Source_Format,data.max_object_data_buffer_length);
+			if(shader_source_byte_length < 0) throw Runtime_Exception("Error during processing vertex shader string.");
+
+			GLuint vertex_shader = create_shader(GL_VERTEX_SHADER,shader_source,std::size_t(shader_source_byte_length));
 			defer[&]{glDeleteShader(vertex_shader);};
 
-			GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER,Fragment_Shader_Source,sizeof(Fragment_Shader_Source) - 1);
+			char fragment_shader_switch_case_strings[4096] = {};
+			std::size_t fragment_shader_switch_case_string_byte_length = 0;
+			for(std::size_t i = 0;i < Max_Simultaneous_Textures;i += 1) {
+				int count = std::snprintf(&fragment_shader_switch_case_strings[fragment_shader_switch_case_string_byte_length],
+										  sizeof(fragment_shader_switch_case_strings) - 1 - fragment_shader_switch_case_string_byte_length,
+										  "case %zu: out_color = texture(texs[%zu],out_tex_coords); break;\n",i,i);
+				if(count < 0) throw Runtime_Exception("Error during processing fragment shader string.");
+				fragment_shader_switch_case_string_byte_length += std::size_t(count);
+			}
+
+			shader_source_byte_length = std::snprintf(shader_source,sizeof(shader_source) - 1,Fragment_Shader_Source_Format,Max_Simultaneous_Textures,fragment_shader_switch_case_strings);
+			if(shader_source_byte_length < 0) throw Runtime_Exception("Error during processing fragment shader string.");
+			
+			GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER,shader_source,std::size_t(shader_source_byte_length));
 			defer[&]{glDeleteShader(fragment_shader);};
 
 			data.shader_program = glCreateProgram();
@@ -119,146 +174,139 @@ namespace core {
 				throw Runtime_Exception(info_log_buffer);
 			}
 		}
-		
-		glGenVertexArrays(1,&data.vertex_array);
-		glBindVertexArray(data.vertex_array);
-
-		glGenBuffers(1,&data.quad_buffer);
-		glBindBuffer(GL_ARRAY_BUFFER,data.quad_buffer);
-
-		Vertex quad_data[] = {
-			{{-0.5f, 0.5f},{0.0f,0.0f}},
-			{{ 0.5f, 0.5f},{1.0f,0.0f}},
-			{{ 0.5f,-0.5f},{1.0f,1.0f}},
-			{{-0.5f, 0.5f},{0.0f,0.0f}},
-			{{ 0.5f,-0.5f},{1.0f,1.0f}},
-			{{-0.5f,-0.5f},{0.0f,1.0f}},
-		};
-		glBufferData(GL_ARRAY_BUFFER,GLsizeiptr(sizeof(quad_data)),quad_data,GL_STATIC_DRAW);
-
+		glUseProgram(data.shader_program);
 		GLint position_location = glGetAttribLocation(data.shader_program,"position");
 		GLint tex_coords_location = glGetAttribLocation(data.shader_program,"tex_coords");
+		
+		{
+			glGenVertexArrays(1,&data.vertex_array);
+			glBindVertexArray(data.vertex_array);
 
-		glEnableVertexAttribArray(position_location);
-		glVertexAttribPointer(position_location,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(0));
+			glGenBuffers(1,&data.quad_buffer_id);
+			glBindBuffer(GL_ARRAY_BUFFER,data.quad_buffer_id);
 
-		glEnableVertexAttribArray(tex_coords_location);
-		glVertexAttribPointer(tex_coords_location,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(2 * sizeof(float)));
+			Vertex quad_data[] = {
+				{{0,0,0},{0.0f,0.0f}},
+				{{1,0,0},{1.0f,0.0f}},
+				{{1,1,0},{1.0f,1.0f}},
+				{{0,0,0},{0.0f,0.0f}},
+				{{1,1,0},{1.0f,1.0f}},
+				{{0,1,0},{0.0f,1.0f}},
+			};
+			glBufferData(GL_ARRAY_BUFFER,sizeof(quad_data),quad_data,GL_STATIC_DRAW);
+			GLint64 actual_buffer_size = 0;
+			glGetBufferParameteri64v(GL_ARRAY_BUFFER,GL_BUFFER_SIZE,&actual_buffer_size);
+			if(actual_buffer_size != sizeof(quad_data)) throw Runtime_Exception("Couldn't allocate quad buffer memory.");
 
-		glUseProgram(data.shader_program);
-		glActiveTexture(GL_TEXTURE0);
-		glUniform1i(glGetUniformLocation(data.shader_program,"tex0"),0);
+			glEnableVertexAttribArray(position_location);
+			glVertexAttribPointer(position_location,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(0));
+
+			glEnableVertexAttribArray(tex_coords_location);
+			glVertexAttribPointer(tex_coords_location,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3 * sizeof(float)));
+		}
+		{
+			std::vector<GLint> sampler_ids{};
+			sampler_ids.resize(Max_Simultaneous_Textures);
+			for(std::size_t i = 0;i < Max_Simultaneous_Textures;i += 1) {
+				glActiveTexture(GL_TEXTURE0 + i);
+				sampler_ids[i] = i;
+			}
+			glUniform1iv(glGetUniformLocation(data.shader_program,"texs"),Max_Simultaneous_Textures,sampler_ids.data());
+		}
+		
+		Mat4 matrix = core::orthographic(0,dims.width,0,dims.height,-1,1);
+		glUniformMatrix4fv(glGetUniformLocation(data.shader_program,"matrix"),1,GL_FALSE,&matrix(0,0));
+
+		{
+			glGenBuffers(1,&data.object_data_buffer_id);
+			glBindBuffer(GL_UNIFORM_BUFFER,data.object_data_buffer_id);
+			std::size_t desired_buffer_size = data.max_object_data_buffer_length * sizeof(Object_Data);
+			glBufferData(GL_UNIFORM_BUFFER,desired_buffer_size,nullptr,GL_DYNAMIC_DRAW);
+
+			GLint64 actual_buffer_size = 0;
+			glGetBufferParameteri64v(GL_UNIFORM_BUFFER,GL_BUFFER_SIZE,&actual_buffer_size);
+			if(actual_buffer_size != desired_buffer_size) throw Runtime_Exception("Couldn't allocate scene data buffer memory.");
+
+			GLint scene_data_uniform_index = glGetUniformBlockIndex(data.shader_program,"Scene_Data");
+			if(scene_data_uniform_index == GL_INVALID_INDEX) throw Runtime_Exception("There is no 'Scene_Data' uniform variable in the shader program.");
+
+			glUniformBlockBinding(data.shader_program,scene_data_uniform_index,0);
+			glBindBufferBase(GL_UNIFORM_BUFFER,0,data.object_data_buffer_id);
+		}
 	};
 
 	Renderer::~Renderer() {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
-		glDeleteBuffers(1,&data.quad_buffer);
+		glDeleteBuffers(1,&data.object_data_buffer_id);
+		glDeleteBuffers(1,&data.quad_buffer_id);
 		glDeleteVertexArrays(1,&data.vertex_array);
 		glDeleteProgram(data.shader_program);
 	}
 
-	void Renderer::begin(float r,float g,float b,const Texture& texture) {
+	void Renderer::begin(float r,float g,float b) {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 
 		if(platform->window_resized()) {
 			auto dims = platform->window_client_dimensions();
 			glViewport(0,0,dims.width,dims.height);
+			Mat4 matrix = core::orthographic(0,dims.width,0,dims.height,-1,1);
+			glUniformMatrix4fv(glGetUniformLocation(data.shader_program,"matrix"),1,GL_FALSE,&matrix(0,0));
 		}
 
 		glClearColor(r,g,b,1.0f);
-		glClearDepth(1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glBindTexture(GL_TEXTURE_2D,texture.texture_id);
-		glDrawArrays(GL_TRIANGLES,0,6);
+
+		data.bound_texture_ids_length = 0;
+		data.object_data_buffer_current_index = 0;
+		data.object_data_buffer_ptr = glMapBuffer(GL_UNIFORM_BUFFER,GL_WRITE_ONLY);
+		if(!data.object_data_buffer_ptr) throw Runtime_Exception("Couldn't map uniform buffer memory.");
 	}
 
 	void Renderer::end() {
+		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 
+		glUnmapBuffer(GL_UNIFORM_BUFFER);
+		glDrawArraysInstanced(GL_TRIANGLES,0,6,data.object_data_buffer_current_index);
+	}
+
+	void Renderer::draw_quad(Vec3 position,Vec2 size,const Texture& texture) {
+		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
+
+		if((data.object_data_buffer_current_index + 1) >= data.max_object_data_buffer_length) {
+			glUnmapBuffer(GL_UNIFORM_BUFFER);
+			glDrawArraysInstanced(GL_TRIANGLES,0,6,data.object_data_buffer_current_index);
+			data.bound_texture_ids_length = 0;
+			data.object_data_buffer_current_index = 0;
+			data.object_data_buffer_ptr = glMapBuffer(GL_UNIFORM_BUFFER,GL_WRITE_ONLY);
+			if(!data.object_data_buffer_ptr) throw Runtime_Exception("Couldn't map uniform buffer memory.");
+		}
+
+		std::uint32_t bound_id = 0;
+		bool is_bound = false;
+		for(std::size_t i = 0;i < data.bound_texture_ids_length;i += 1) {
+			if(data.bound_texture_ids[i] == texture.texture_id) {
+				is_bound = true;
+				bound_id = i;
+				break;
+			}
+		}
+		if(!is_bound) {
+			if((data.bound_texture_ids_length + 1) >= Max_Simultaneous_Textures) throw Runtime_Exception("Too many textures.");
+			bound_id = data.bound_texture_ids_length;
+			glActiveTexture(GL_TEXTURE0 + bound_id);
+			data.bound_texture_ids[bound_id] = texture.texture_id;
+			glBindTexture(GL_TEXTURE_2D,texture.texture_id);
+			data.bound_texture_ids_length += 1;
+		}
+
+		Object_Data object_data = {};
+		object_data.transformation = core::translate(position.x,position.y,position.z) * core::scale(size.x,size.y,1);
+		object_data.texture_index = bound_id;
+		std::memcpy(static_cast<char*>(data.object_data_buffer_ptr) + data.object_data_buffer_current_index * sizeof(Object_Data),&object_data,sizeof(Object_Data));
+		data.object_data_buffer_current_index += 1;
 	}
 
 	Texture Renderer::create_texture(std::uint32_t width,std::uint32_t height,const std::uint8_t* pixels) {
 		return Texture(this,width,height,pixels);
-
-		/*static constexpr std::uint32_t Compression_None = 0;
-		static constexpr std::uint32_t Compression_None_With_Bitfields = 3;
-
-		std::strcpy(info_log_buffer,file_name);
-
-		auto file = std::ifstream(file_name,std::ios::binary);
-		if(!file.is_open()) throw Tagged_Runtime_Exception<const char*>("Couldn't open a file",info_log_buffer);
-
-		char magic[2] = {};
-		if(!file.read(magic,2)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 2 bytes from file",info_log_buffer);
-		if(magic[0] != 'B' || magic[1] != 'M') throw Tagged_Runtime_Exception<const char*>("Invalid magic bytes at the beginning",info_log_buffer);
-
-		std::uint32_t bitmap_size = 0;
-		if(!file.read(reinterpret_cast<char*>(&bitmap_size),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-		std::uint32_t reserved_bytes = 0;
-		if(!file.read(reinterpret_cast<char*>(&reserved_bytes),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-		std::uint32_t pixel_byte_offset = 0;
-		if(!file.read(reinterpret_cast<char*>(&pixel_byte_offset),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-		std::uint32_t bitmap_info_header_size = 0;
-		if(!file.read(reinterpret_cast<char*>(&bitmap_info_header_size),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-		
-		//BITMAPV4HEADER or BITMAPV5HEADER
-		std::uint32_t compression_method = 0;
-		std::int32_t width = 0;
-		std::int32_t height = 0;
-		if(bitmap_info_header_size == 108 || bitmap_info_header_size == 124) {
-			if(!file.read(reinterpret_cast<char*>(&width),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-			if(!file.read(reinterpret_cast<char*>(&height),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-			std::uint16_t plane_count = 0;
-			if(!file.read(reinterpret_cast<char*>(&plane_count),2)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 2 bytes from file",info_log_buffer);
-			if(plane_count != 1) throw Tagged_Runtime_Exception<const char*>("Invalid bitmap info header",info_log_buffer);
-
-			std::uint16_t bits_per_pixel = 0;
-			if(!file.read(reinterpret_cast<char*>(&bits_per_pixel),2)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 2 bytes from file",info_log_buffer);
-			if(bits_per_pixel != 32) throw Tagged_Runtime_Exception<const char*>("Invalid bitmap info header (number of bits per pixel != 32)",info_log_buffer);
-
-			if(!file.read(reinterpret_cast<char*>(&compression_method),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-			if(compression_method != Compression_None && compression_method != Compression_None_With_Bitfields) throw Tagged_Runtime_Exception<const char*>("Invalid bitmap info header (bitmap uses compression)",info_log_buffer);
-
-			std::uint32_t image_size = 0;
-			if(!file.read(reinterpret_cast<char*>(&image_size),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-			std::int32_t hor_resolution = 0;
-			if(!file.read(reinterpret_cast<char*>(&hor_resolution),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-			std::int32_t ver_resolution = 0;
-			if(!file.read(reinterpret_cast<char*>(&ver_resolution),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-			std::uint32_t important_color_count = 0;
-			if(!file.read(reinterpret_cast<char*>(&important_color_count),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-			std::uint32_t used_important_color_count = 0;
-			if(!file.read(reinterpret_cast<char*>(&used_important_color_count),4)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 4 bytes from file",info_log_buffer);
-
-			std::uint32_t rgba_masks[4] = {};
-			if(!file.read(reinterpret_cast<char*>(rgba_masks),16)) throw Tagged_Runtime_Exception<const char*>("Couldn't read 16 bytes from file",info_log_buffer);
-		}
-		else throw Tagged_Runtime_Exception<const char*>("Invalid bitmap info header",info_log_buffer);
-
-		if(!file.seekg(pixel_byte_offset,std::ios::beg)) throw Tagged_Runtime_Exception<const char*>("Couldn't read some bytes",info_log_buffer);
-
-		std::vector<std::uint8_t> pixels = {};
-		pixels.resize(std::size_t(width) * height * 4);
-		if(compression_method == Compression_None) {
-			if(!file.read(reinterpret_cast<char*>(pixels.data()),pixels.size())) throw Tagged_Runtime_Exception<const char*>("Couldn't read pixels",info_log_buffer);
-		}
-		else if(compression_method == Compression_None_With_Bitfields) {
-			if(!file.read(reinterpret_cast<char*>(pixels.data()),pixels.size())) throw Tagged_Runtime_Exception<const char*>("Couldn't read pixels",info_log_buffer);
-			for(std::size_t i = 0;i < pixels.size();i += 4) {
-				std::uint8_t byte0 = pixels[i + 0];
-				std::uint8_t byte1 = pixels[i + 1];
-				std::uint8_t byte2 = pixels[i + 2];
-				std::uint8_t byte3 = pixels[i + 3];
-
-			}
-		}
-		return Texture(this,0,0,pixels.data());*/
 	}
 }

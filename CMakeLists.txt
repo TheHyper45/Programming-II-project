@@ -25,6 +25,8 @@ add_executable(tanks
     code/renderer.hpp
     code/renderer.cpp
     code/opengl.hpp
+    code/math.hpp
+    code/math.cpp
     ${PLATFORM_FILES}
 )
 
@@ -43,8 +45,8 @@ if(MSVC)
     target_link_libraries(tanks PRIVATE OpenGL32.lib)
 elseif(MINGW)
     target_compile_definitions(tanks PRIVATE __USE_MINGW_ANSI_STDIO=1)
-    target_compile_options(tanks PRIVATE -Wall -Wextra -Wconversion -Wshadow -Wno-missing-field-initializers -pedantic)
+    target_compile_options(tanks PRIVATE -Wall -Wextra -Wconversion -Wshadow -Wno-missing-field-initializers -Wno-cast-function-type -pedantic)
     target_link_libraries(tanks PRIVATE OpenGL32.lib)
 else()
-    target_compile_options(tanks PRIVATE -Wall -Wextra -Wconversion -Wshadow -Wno-missing-field-initializers -pedantic)
+    target_compile_options(tanks PRIVATE -Wall -Wextra -Wconversion -Wshadow -Wno-missing-field-initializers -Wno-cast-function-type -pedantic)
 endif()

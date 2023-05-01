@@ -3,15 +3,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "math.hpp"
 
 namespace core {
-	struct Vec2 {
-		float x;
-		float y;
-	};
-
 	struct Vertex {
-		Vec2 position;
+		Vec3 position;
 		Vec2 tex_coords;
 	};
 
@@ -35,12 +31,13 @@ namespace core {
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
 		~Renderer();
-		void begin(float r,float g,float b,const Texture& texture);
+		void begin(float r,float g,float b);
 		void end();
+		void draw_quad(Vec3 position,Vec2 size,const Texture& texture);
 		[[nodiscard]] Texture create_texture(std::uint32_t width,std::uint32_t height,const std::uint8_t* pixels);
 	private:
 		Platform* platform;
-		alignas(std::max_align_t) unsigned char data_buffer[64];
+		alignas(std::max_align_t) unsigned char data_buffer[128];
 		friend class Texture;
 	};
 }

@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <vector>
 #include <random>
+#include <chrono>
 #include <iostream>
 #include <exception>
 #include "platform.hpp"
@@ -19,27 +20,61 @@ int main() {
 
         std::vector<std::uint8_t> pixels = {};
         pixels.resize(1024);
-        for(std::size_t i = 0;i < pixels.size();i += 1) pixels[i] = random_dist(random_engine);
+        for(std::size_t i = 0;i < pixels.size();i += 4) {
+            pixels[i + 0] = random_dist(random_engine);
+            pixels[i + 1] = random_dist(random_engine);
+            pixels[i + 2] = random_dist(random_engine);
+            pixels[i + 3] = 255;
+        }
+
+        std::vector<std::uint8_t> pixels1 = {};
+        pixels1.resize(1024);
+        for(std::size_t i = 0;i < pixels1.size();i += 4) {
+            pixels1[i + 0] = random_dist(random_engine);
+            pixels1[i + 1] = pixels1[i + 0];
+            pixels1[i + 2] = pixels1[i + 0];
+            pixels1[i + 3] = 255;
+        }
 
         auto texture = renderer.create_texture(16,16,pixels.data());
+        auto texture1 = renderer.create_texture(16,16,pixels1.data());
 
+        float pos_x = 512.0f;
+        float pos_y = 384.0f;
+
+        auto start_time = std::chrono::steady_clock::now();
         while(!platform.window_closed()) {
+            auto end_time = std::chrono::steady_clock::now();
+            float delta_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count() / 1000000.0f;
+            start_time = end_time;
+
             platform.process_events();
 
-            if(platform.was_key_pressed(core::Keycode::U)) {
-                std::cout << "U" << std::endl;
-            }
             if(platform.is_key_down(core::Keycode::A)) {
-                std::cout << "A" << std::endl;
+                pos_x -= delta_time * 500.0f;
             }
-            if(platform.is_key_down(core::Keycode::Mouse_Left)) {
-                std::cout << "Left mouse" << std::endl;
+            if(platform.is_key_down(core::Keycode::D)) {
+                pos_x += delta_time * 500.0f;
             }
-            if(platform.was_key_pressed(core::Keycode::Mouse_Right)) {
-                std::cout << "Right mouse" << std::endl;
+            if(platform.is_key_down(core::Keycode::W)) {
+                pos_y -= delta_time * 500.0f;
+            }
+            if(platform.is_key_down(core::Keycode::S)) {
+                pos_y += delta_time * 500.0f;
+            }
+            if(platform.was_key_pressed(core::Keycode::Space)) {
+                std::cout << "FPS: " << 1.0f / delta_time << std::endl;
             }
 
-            renderer.begin(0.0f,0.0f,0.0f,texture);
+            renderer.begin(0.0f,0.0f,0.0f);
+            
+            for(std::uint32_t x = 0;x < 32;x += 1) {
+                for(std::uint32_t y = 0;y < 24;y += 1) {
+                    renderer.draw_quad({x * 32.0f,y * 32.0f,0},{32,32},texture1);
+                }
+            }
+
+            renderer.draw_quad({pos_x,pos_y,0},{32,32},texture);
             renderer.end();
 
             platform.swap_window_buffers();

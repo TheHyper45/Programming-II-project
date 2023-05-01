@@ -1,3 +1,4 @@
+#include <cstring>
 #include <iostream>
 #undef UNICODE
 #define WIN32_LEAN_AND_MEAN
@@ -6,6 +7,8 @@
 #endif
 #include <Windows.h>
 #include <Windowsx.h>
+#undef near
+#undef far
 #include "defer.hpp"
 #include "opengl.hpp"
 #include "wglext.h"
@@ -14,7 +17,7 @@
 
 namespace core {
 	static constexpr const char* Window_Class_Name = "CustomWindowClass";
-	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_MINIMIZEBOX | WS_SIZEBOX | WS_VISIBLE;
+	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_CAPTION | WS_MINIMIZEBOX | WS_VISIBLE;
 	static constexpr int Array_End_Marker = 0;
 
 	const char* keycode_to_string(Keycode code) {
@@ -302,7 +305,7 @@ namespace core {
 		return wglCreateContextAttribsARB(data.dc,nullptr,context_attributes);
 	}
 
-	void Platform::create_main_window(const char* title,std::uint32_t width,std::uint32_t height) {
+	void Platform::create_main_window(const char* title,std::uint32_t client_width,std::uint32_t client_height) {
 		Platform_Windows_Data& data = *std::launder(reinterpret_cast<Platform_Windows_Data*>(data_buffer));
 		WNDCLASSEXA wc = {};
 		wc.cbSize = sizeof(wc);
@@ -314,18 +317,15 @@ namespace core {
 		wc.cbWndExtra = sizeof(Platform_Windows_Data*) + sizeof(LONG_PTR);
 		if(!RegisterClassExA(&wc)) throw Runtime_Exception("Couldn't register window class.");
 
-		RECT client_rect = {0,0,LONG(width),LONG(height)};
+		data.window_client_dims = {client_width,client_height};
+		RECT client_rect = {0,0,LONG(client_width),LONG(client_height)};
 		if(!AdjustWindowRect(&client_rect,Window_Flags,FALSE)) throw Runtime_Exception("Couldn't adjust client rect dimensions.");
-		width = std::uint32_t(client_rect.right - client_rect.left);
-		height = std::uint32_t(client_rect.bottom - client_rect.top);
+		client_width = std::uint32_t(client_rect.right - client_rect.left);
+		client_height = std::uint32_t(client_rect.bottom - client_rect.top);
 
-		data.window = CreateWindowExA(0,Window_Class_Name,title,Window_Flags,CW_USEDEFAULT,CW_USEDEFAULT,int(width),int(height),HWND_DESKTOP,nullptr,GetModuleHandleA(nullptr),nullptr);
+		data.window = CreateWindowExA(0,Window_Class_Name,title,Window_Flags,CW_USEDEFAULT,CW_USEDEFAULT,int(client_width),int(client_height),HWND_DESKTOP,nullptr,GetModuleHandleA(nullptr),nullptr);
 		if(!data.window) throw Runtime_Exception("Couldn't create a window.");
 		data.window_closed = false;
-
-		RECT rect = {};
-		GetClientRect(data.window,&rect);
-		data.window_client_dims = {std::uint32_t(rect.right),std::uint32_t(rect.bottom)};
 		
 		data.dc = GetDC(data.window);
 		if(!data.dc) throw Runtime_Exception("Couldn't get window DC.");

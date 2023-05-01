@@ -158,7 +158,7 @@ namespace core {
 		Platform(const Platform&) = delete;
 		Platform& operator=(const Platform&) = delete;
 		~Platform();
-		void create_main_window(const char* title,std::uint32_t width,std::uint32_t height);
+		void create_main_window(const char* title,std::uint32_t client_width,std::uint32_t client_height);
 		[[nodiscard]] bool window_closed() noexcept;
 		[[nodiscard]] bool window_resized() noexcept;
 		[[nodiscard]] Dimensions window_client_dimensions() noexcept;
