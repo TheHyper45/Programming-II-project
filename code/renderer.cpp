@@ -13,12 +13,12 @@
 #include "exceptions.hpp"
 
 namespace core {
-	//static constexpr std::size_t Max_Simultaneous_Textures = 4;
 	static constexpr std::size_t Scene_Data_Uniform_Buffer_Size = 16384;
 	static char info_log_buffer[4096];
 
 	struct Object_Data {
 		alignas(16) Mat4 matrix;
+		alignas(16) std::uint32_t texture_index;
 	};
 
 	struct Sprite {
@@ -28,6 +28,7 @@ namespace core {
 		GLuint scene_data_uniform_buffer;
 		std::vector<Object_Data> object_datas;
 		std::size_t current_object_data_index;
+		std::uint32_t array_layers;
 	};
 
 	struct Renderer_Internal_Data {
@@ -42,9 +43,11 @@ namespace core {
 		in vec3 position;
 		in vec2 tex_coords;
 		out vec2 out_tex_coords;
+		out flat uint out_texture_index;
 		uniform mat4 projection_matrix;
 		struct Object_Data {
 			mat4 matrix;
+			uint texture_index;
 		};
 		layout(std140,binding = 0) uniform Scene_Data {
 			Object_Data[204] object_datas;
@@ -52,16 +55,18 @@ namespace core {
 		void main() {
 			gl_Position = projection_matrix * object_datas[gl_InstanceID].matrix * vec4(position,1.0);
 			out_tex_coords = tex_coords;
+			out_texture_index = object_datas[gl_InstanceID].texture_index;
 		}
 	)xxx";
 
 	static constexpr const char Fragment_Shader_Source_Format[] = R"xxx(
 		#version 420 core
 		in vec2 out_tex_coords;
+		in flat uint out_texture_index;
 		out vec4 out_color;
-		uniform sampler2D sprite_textures;
+		uniform sampler2DArray sprite_textures;
 		void main() {
-			out_color = texture(sprite_textures,out_tex_coords);
+			out_color = texture(sprite_textures,vec3(out_tex_coords,float(out_texture_index)));
 		}
 	)xxx";
 
@@ -246,27 +251,50 @@ namespace core {
 			if(!sprite.has_value) continue;
 			glBindBufferBase(GL_UNIFORM_BUFFER,0,sprite.scene_data_uniform_buffer);
 			glBufferSubData(GL_UNIFORM_BUFFER,0,sprite.current_object_data_index * sizeof(Object_Data),sprite.object_datas.data());
-			glBindTexture(GL_TEXTURE_2D,sprite.texture_id);
+			glBindTexture(GL_TEXTURE_2D_ARRAY,sprite.texture_id);
 			glDrawArraysInstanced(GL_TRIANGLES,0,6,sprite.current_object_data_index);
 			sprite.current_object_data_index = 0;
 		}
 		glDrawArrays(GL_TRIANGLES,0,6);
 	}
 
-	void Renderer::draw_sprite(Vec2 position,Vec2 size,const Sprite_Index& sprite_index) {
+	void Renderer::draw_sprite(Vec2 position,Vec2 size,const Sprite_Index& sprite_index,std::uint32_t tile_index) {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
-		if(sprite_index.index >= data.sprites.size()) throw Runtime_Exception("Invalid sprite index (out of bounds).");
+		if(sprite_index.index >= data.sprites.size()) {
+#if defined(DEBUG_BUILD)
+			std::cerr << "[Rendering] Invalid sprite index (index: " << sprite_index.index << ", generation: " << sprite_index.generation << ")." << std::endl;
+			return;
+#else
+			throw Runtime_Exception("Invalid sprite index (out of bounds).");
+#endif
+		}
 		Sprite& sprite = data.sprites[sprite_index.index];
-		if(sprite.generation != sprite_index.generation || !sprite.has_value) throw Runtime_Exception("Invalid sprite index (outdated).");
+		if(sprite.generation != sprite_index.generation || !sprite.has_value) {
+#if defined(DEBUG_BUILD)
+			std::cerr << "[Rendering] Invalid sprite index (index: " << sprite_index.index << ", generation: " << sprite_index.generation << ")." << std::endl;
+			return;
+#else
+			throw Runtime_Exception("Invalid sprite index (outdated).");
+#endif
+		}
+		if(tile_index >= sprite.array_layers) {
+#if defined(DEBUG_BUILD)
+			std::cerr << "[Rendering] Invalid sprite tile index (" << tile_index << ")." << std::endl;
+			return;
+#else
+			throw Runtime_Exception("Invalid sprite tile index.");
+#endif
+		}
 
 		if((sprite.current_object_data_index + 1) >= sprite.object_datas.size()) {
 			glBindBufferBase(GL_UNIFORM_BUFFER,0,sprite.scene_data_uniform_buffer);
 			glBufferSubData(GL_UNIFORM_BUFFER,0,sprite.current_object_data_index * sizeof(Object_Data),sprite.object_datas.data());
-			glBindTexture(GL_TEXTURE_2D,sprite.texture_id);
+			glBindTexture(GL_TEXTURE_2D_ARRAY,sprite.texture_id);
 			glDrawArraysInstanced(GL_TRIANGLES,0,6,sprite.current_object_data_index);
 			sprite.current_object_data_index = 0;
 		}
 		sprite.object_datas[sprite.current_object_data_index].matrix = core::translate(position.x,position.y,0) * core::scale(size.x,size.y,1);
+		sprite.object_datas[sprite.current_object_data_index].texture_index = tile_index;
 		sprite.current_object_data_index += 1;
 	}
 
@@ -295,6 +323,8 @@ namespace core {
 
 		auto width = read.operator()<std::int32_t>();
 		auto height = read.operator()<std::int32_t>();
+		if(width <= 0) throw Runtime_Exception("Width must be > 0");
+		if(height <= 0) throw Runtime_Exception("Height must be > 0");
 
 		auto plane_count = read.operator()<std::uint16_t>();
 		if(plane_count != 1) throw File_Exception(info_log_buffer,"Plane count must be 1");
@@ -316,11 +346,15 @@ namespace core {
 		auto blue_mask = read.operator()<std::uint32_t>();
 		auto alpha_mask = read.operator()<std::uint32_t>();
 
+		//BITMAPV5HEADER has more fields, but we are ignoring them for simplicity.
 		if(!file.seekg(pixel_data_offset,std::ios::beg)) throw File_Seek_Exception(info_log_buffer,pixel_data_offset);
 
 		std::vector<std::uint8_t> pixels{};
 		pixels.resize(std::size_t(width) * height * 4);
-		if(!file.read(reinterpret_cast<char*>(pixels.data()),pixels.size())) throw File_Read_Exception(info_log_buffer,pixels.size());
+		//BMP files are stored fliped around the X axis so we need to read it backwards.
+		for(std::uint32_t y = 0;y < height;y += 1) {
+			if(!file.read(reinterpret_cast<char*>(&pixels[(std::size_t(height) - y - 1) * width * 4]),std::size_t(width) * 4)) throw File_Read_Exception(info_log_buffer,std::size_t(width) * 4);
+		}
 
 		for(std::size_t i = 0;i < pixels.size();i += 4) {
 			std::uint32_t value = (std::uint32_t(pixels[i + 3]) << 24u) | (std::uint32_t(pixels[i + 2]) << 16u) | (std::uint32_t(pixels[i + 1]) << 8u) | (std::uint32_t(pixels[i + 0]) << 0u);
@@ -329,38 +363,107 @@ namespace core {
 			pixels[i + 2] = ((value & blue_mask) >> core::leading_zeroes(blue_mask));
 			pixels[i + 3] = ((value & alpha_mask) >> core::leading_zeroes(alpha_mask));
 		}
+
 		*out_width = width;
 		*out_height = height;
 		return pixels;
 	}
 
-	Sprite_Index Renderer::new_sprite(const char* file_path) {
+	Sprite_Index Renderer::sprite(const char* file_path) {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 
 		std::uint32_t width = 0;
 		std::uint32_t height = 0;
 		std::vector<std::uint8_t> pixels = core::load_bitmap_from_file(file_path,&width,&height);
+#if defined(DEBUG_BUILD)
+		std::cout << "[Rendering] Loading an image from file \"" << file_path << "\" (width: " << width << ", height: " << height << ")." << std::endl;
+#endif
 
 		GLuint texture_id = 0;
 		glGenTextures(1,&texture_id);
-		glBindTexture(GL_TEXTURE_2D,texture_id);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-		glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+		glBindTexture(GL_TEXTURE_2D_ARRAY,texture_id);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_S,GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_T,GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+		glTexImage3D(GL_TEXTURE_2D_ARRAY,0,GL_RGBA,width,height,1,0,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
 
 		GLuint uniform_buffer_id = 0;
 		glGenBuffers(1,&uniform_buffer_id);
 		glBindBuffer(GL_UNIFORM_BUFFER,uniform_buffer_id);
 		glBufferData(GL_UNIFORM_BUFFER,Scene_Data_Uniform_Buffer_Size,nullptr,GL_DYNAMIC_DRAW);
 
-		GLint64 actual_size = 0;
-		glGetBufferParameteri64v(GL_UNIFORM_BUFFER,GL_BUFFER_SIZE,&actual_size);
-		if(Scene_Data_Uniform_Buffer_Size != actual_size) {
-			glDeleteTextures(1,&texture_id);
-			throw Runtime_Exception("Couldn't allocate an uniform buffer.");
+		try {
+			GLint64 actual_size = 0;
+			glGetBufferParameteri64v(GL_UNIFORM_BUFFER,GL_BUFFER_SIZE,&actual_size);
+			if(Scene_Data_Uniform_Buffer_Size != actual_size) throw Runtime_Exception("Couldn't allocate an uniform buffer.");
+			return insert_sprite(texture_id,uniform_buffer_id,1);
 		}
+		catch(...) {
+			glDeleteBuffers(1,&uniform_buffer_id);
+			glDeleteTextures(1,&texture_id);
+			throw;
+		}
+	}
+
+	Sprite_Index Renderer::sprite_atlas(const char* file_path,std::uint32_t tile_dimension) {
+		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
+
+		std::uint32_t width = 0;
+		std::uint32_t height = 0;
+		std::vector<std::uint8_t> pixels = core::load_bitmap_from_file(file_path,&width,&height);
+		if((width % tile_dimension) != 0 || (height % tile_dimension) != 0) throw Runtime_Exception("Invalid sprite atlas tile size.");
+#if defined(DEBUG_BUILD)
+		std::cout << "[Rendering] Loading an image from file \"" << file_path << "\" (width: " << width << ", height: " << height << ")." << std::endl;
+#endif
+
+		GLuint texture_id = 0;
+		glGenTextures(1,&texture_id);
+		glBindTexture(GL_TEXTURE_2D_ARRAY,texture_id);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_S,GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_T,GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+
+		std::uint32_t tile_count_x = width / tile_dimension;
+		std::uint32_t tile_count_y = height / tile_dimension;
+		glTexImage3D(GL_TEXTURE_2D_ARRAY,0,GL_RGBA,tile_dimension,tile_dimension,tile_count_x * tile_count_y,0,GL_RGBA,GL_UNSIGNED_BYTE,nullptr);
+
+		GLuint uniform_buffer_id = 0;
+		try {
+			std::vector<std::uint8_t> tmp_pixels = {};
+			tmp_pixels.resize(std::size_t(tile_dimension) * tile_dimension * 4);
+
+			for(std::uint32_t base_y = 0;base_y < height;base_y += tile_dimension) {
+				for(std::uint32_t x = 0;x < width;x += tile_dimension) {
+					std::uint32_t offset = 0;
+					for(std::uint32_t y = 0;y < tile_dimension;y += 1) {
+						std::memcpy(&tmp_pixels[offset],&pixels[((std::size_t(base_y) + y) * width + x) * 4],std::size_t(tile_dimension) * 4);
+						offset += tile_dimension * 4;
+					}
+					std::uint32_t index = (base_y / tile_dimension) * tile_count_x + (x / tile_dimension);
+					glTexSubImage3D(GL_TEXTURE_2D_ARRAY,0,0,0,index,tile_dimension,tile_dimension,1,GL_RGBA,GL_UNSIGNED_BYTE,tmp_pixels.data());
+				}
+			}
+
+			glGenBuffers(1,&uniform_buffer_id);
+			glBindBuffer(GL_UNIFORM_BUFFER,uniform_buffer_id);
+			glBufferData(GL_UNIFORM_BUFFER,Scene_Data_Uniform_Buffer_Size,nullptr,GL_DYNAMIC_DRAW);
+
+			GLint64 actual_size = 0;
+			glGetBufferParameteri64v(GL_UNIFORM_BUFFER,GL_BUFFER_SIZE,&actual_size);
+			if(Scene_Data_Uniform_Buffer_Size != actual_size) throw Runtime_Exception("Couldn't allocate an uniform buffer.");
+			return insert_sprite(texture_id,uniform_buffer_id,tile_count_x * tile_count_y);
+		}
+		catch(...) {
+			if(glIsBuffer(uniform_buffer_id)) glDeleteBuffers(1,&uniform_buffer_id);
+			glDeleteTextures(1,&texture_id);
+			throw;
+		}
+	}
+
+	Sprite_Index Renderer::insert_sprite(unsigned int texture_id,unsigned int uniform_buffer_id,std::uint32_t array_layers) {
+		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 
 		for(std::size_t i = 0;i < data.sprites.size();i += 1) {
 			auto& sprite = data.sprites[i];
@@ -369,26 +472,22 @@ namespace core {
 				sprite.generation += 1;
 				sprite.texture_id = texture_id;
 				sprite.scene_data_uniform_buffer = uniform_buffer_id;
+				sprite.array_layers = array_layers;
 				sprite.current_object_data_index = 0;
 				return {i,sprite.generation};
 			}
 		}
-		try {
-			Sprite sprite{};
-			sprite.has_value = true;
-			sprite.generation = 1;
-			sprite.texture_id = texture_id;
-			sprite.scene_data_uniform_buffer = uniform_buffer_id;
-			sprite.current_object_data_index = 0;
-			sprite.object_datas.resize(204);
-			data.sprites.push_back(std::move(sprite));
-			return {data.sprites.size() - 1,1};
-		}
-		catch(...) {
-			glDeleteBuffers(1,&uniform_buffer_id);
-			glDeleteTextures(1,&texture_id);
-			throw;
-		}
+
+		Sprite sprite{};
+		sprite.has_value = true;
+		sprite.generation = 1;
+		sprite.texture_id = texture_id;
+		sprite.scene_data_uniform_buffer = uniform_buffer_id;
+		sprite.array_layers = array_layers;
+		sprite.current_object_data_index = 0;
+		sprite.object_datas.resize(204);
+		data.sprites.push_back(std::move(sprite));
+		return {data.sprites.size() - 1,1};
 	}
 
 	void Renderer::adjust_viewport() {
