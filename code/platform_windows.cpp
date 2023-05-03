@@ -13,11 +13,12 @@
 #include "opengl.hpp"
 #include "wglext.h"
 #include "platform.hpp"
+#include "renderer.hpp"
 #include "exceptions.hpp"
 
 namespace core {
 	static constexpr const char* Window_Class_Name = "CustomWindowClass";
-	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_CAPTION | WS_MINIMIZEBOX | WS_VISIBLE;
+	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_CAPTION | WS_SIZEBOX | WS_MINIMIZEBOX | WS_VISIBLE;
 	static constexpr int Array_End_Marker = 0;
 
 	const char* keycode_to_string(Keycode code) {
@@ -274,7 +275,7 @@ namespace core {
 		PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = reinterpret_cast<PFNWGLCREATECONTEXTATTRIBSARBPROC>(wglGetProcAddress("wglCreateContextAttribsARB"));
 		if(!wglCreateContextAttribsARB) throw Runtime_Exception("'wglCreateContextAttribsARB' extension isn't supported.");
 
-		int format_attributes[] = {
+		static constexpr int Format_Attributes[] = {
 			WGL_DRAW_TO_WINDOW_ARB,1,
 			WGL_SUPPORT_OPENGL_ARB,1,
 			WGL_DOUBLE_BUFFER_ARB,1,
@@ -288,7 +289,7 @@ namespace core {
 
 		int pixel_format_index = 0;
 		UINT matching_format_count = 0;
-		if(!wglChoosePixelFormatARB(data.dc,format_attributes,NULL,1,&pixel_format_index,&matching_format_count) || pixel_format_index == 0) {
+		if(!wglChoosePixelFormatARB(data.dc,Format_Attributes,NULL,1,&pixel_format_index,&matching_format_count) || pixel_format_index == 0) {
 			throw Runtime_Exception("Couldn't choose pixel format.");
 		}
 
@@ -296,13 +297,30 @@ namespace core {
 		if(!DescribePixelFormat(data.dc,pixel_format_index,sizeof(format),&format)) throw Runtime_Exception("Couldn't describe pixel format.");
 		if(!SetPixelFormat(data.dc,pixel_format_index,&format)) throw Runtime_Exception("Couldn't set pixel format.");
 
-		int context_attributes[] = {
+#if defined(DEBUG_BUILD)
+		{
+			static constexpr int Context_Attributes[] = {
+				WGL_CONTEXT_MAJOR_VERSION_ARB,4,
+				WGL_CONTEXT_MINOR_VERSION_ARB,3,
+				WGL_CONTEXT_PROFILE_MASK_ARB,WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+				WGL_CONTEXT_FLAGS_ARB,WGL_CONTEXT_DEBUG_BIT_ARB,
+				Array_End_Marker
+			};
+			HGLRC ctx = wglCreateContextAttribsARB(data.dc,nullptr,Context_Attributes);
+			if(ctx) return ctx;
+			std::cout << "[Warning] Your computer doesn't support WGL_CONTEXT_DEBUG_BIT_ARB." << std::endl;
+		}
+#endif
+
+		static constexpr int Context_Attributes[] = {
 			WGL_CONTEXT_MAJOR_VERSION_ARB,4,
-			WGL_CONTEXT_MINOR_VERSION_ARB,2,
+			WGL_CONTEXT_MINOR_VERSION_ARB,3,
 			WGL_CONTEXT_PROFILE_MASK_ARB,WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 			Array_End_Marker
 		};
-		return wglCreateContextAttribsARB(data.dc,nullptr,context_attributes);
+		HGLRC ctx = wglCreateContextAttribsARB(data.dc,nullptr,Context_Attributes);
+		if(!ctx) throw Runtime_Exception("Your computer doesn't support OpenGL 4.3 core.");
+		return ctx;
 	}
 
 	void Platform::create_main_window(const char* title,std::uint32_t client_width,std::uint32_t client_height) {
@@ -311,6 +329,7 @@ namespace core {
 		wc.cbSize = sizeof(wc);
 		wc.lpszClassName = Window_Class_Name;
 		wc.hInstance = GetModuleHandleA(nullptr);
+		wc.hCursor = LoadCursorA(nullptr,IDC_ARROW);
 		wc.hIcon = LoadIconA(nullptr,IDI_APPLICATION);
 		wc.hIconSm = wc.hIcon;
 		wc.lpfnWndProc = &core::window_proc;
@@ -336,7 +355,6 @@ namespace core {
 		}
 
 		data.ctx = core::create_opengl_context(data);
-		if(!data.ctx) throw Runtime_Exception("Couldn't create OpenGL context.");
 		if(!wglMakeCurrent(data.dc,data.ctx)) throw Runtime_Exception("Couldn't make the OpenGL context current.");
 
 		HMODULE opengl32_lib = LoadLibraryA("OpenGL32.dll");
@@ -405,5 +423,9 @@ OPENGL_FUNC_LIST(OPENGL_LOAD_FUNC)
 	Point Platform::mouse_position() const noexcept {
 		const Platform_Windows_Data& data = *std::launder(reinterpret_cast<const Platform_Windows_Data*>(data_buffer));
 		return data.mouse_position;
+	}
+
+	Renderer Platform::create_renderer() {
+		return Renderer(this);
 	}
 }

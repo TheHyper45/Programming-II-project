@@ -1,5 +1,9 @@
 #include "math.hpp"
 
+#if defined(_MSC_VER) && !defined(__clang__)
+	#include <intrin.h>
+#endif
+
 namespace core {
 	Mat4::Mat4(float v) noexcept : data() {
 		operator()(0,0) = v;
@@ -53,5 +57,15 @@ namespace core {
 		result(2,2) = z;
 		result(3,3) = 1.0f;
 		return result;
+	}
+
+	std::uint32_t leading_zeroes(std::uint32_t value) {
+#if defined(_MSC_VER) && !defined(__clang__)
+		unsigned long result = 0;
+		_BitScanForward(&result,value);
+		return result;
+#else
+		return __builtin_ctzl(value);
+#endif
 	}
 }

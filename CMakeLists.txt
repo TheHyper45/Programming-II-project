@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.13)
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
     message(FATAL_ERROR "In-source builds are not allowed.")
 endif()
@@ -33,13 +33,14 @@ add_executable(tanks
 target_compile_features(tanks PRIVATE cxx_std_20)
 set_target_properties(tanks PROPERTIES LINKER_LANGUAGE CXX)
 target_compile_definitions(tanks PRIVATE "$<$<CONFIG:DEBUG>:DEBUG_BUILD>")
+add_custom_command(TARGET tanks POST_BUILD COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:tanks>/assets)
 
 if(MSVC)
     set_property(DIRECTORY ${CMAKE_BINARY_DIR} PROPERTY VS_STARTUP_PROJECT tanks)
     set_target_properties(tanks PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:tanks>"
                                            VS_DEBUGGER_COMMAND "$<TARGET_FILE:tanks>"
                                            VS_DEBUGGER_ENVIRONMENT "PATH=%PATH%;${CMAKE_PREFIX_PATH}/bin")
-    target_compile_options(tanks PRIVATE /utf-8 /W4 /Wall /MP /permissive- /Zc:preprocessor)
+    target_compile_options(tanks PRIVATE /utf-8 /W4 /Wall /MP /permissive- /Zc:preprocessor /wd4514 /wd5045 /wd4820 /wd4626 /wd4191)
     target_link_options(tanks PRIVATE /MANIFEST:EMBED /MANIFESTINPUT:${CMAKE_SOURCE_DIR}/win32app.manifest)
     file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/.editorconfig DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
     target_link_libraries(tanks PRIVATE OpenGL32.lib)

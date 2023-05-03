@@ -152,6 +152,7 @@ namespace core {
 	};
 	[[nodiscard]] const char* keycode_to_string(Keycode code);
 
+	class Renderer;
 	class Platform {
 	public:
 		Platform() noexcept;
@@ -168,6 +169,7 @@ namespace core {
 		[[nodiscard]] bool is_key_down(Keycode code) const noexcept;
 		[[nodiscard]] bool was_key_pressed(Keycode code) const noexcept;
 		[[nodiscard]] Point mouse_position() const noexcept;
+		[[nodiscard]] Renderer create_renderer();
 	private:
 		alignas(std::max_align_t) unsigned char data_buffer[512];
 	};
