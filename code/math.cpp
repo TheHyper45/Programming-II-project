@@ -1,3 +1,4 @@
+#include <cmath>
 #include "math.hpp"
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -47,6 +48,17 @@ namespace core {
 		result(3,0) = x;
 		result(3,1) = y;
 		result(3,2) = z;
+		return result;
+	}
+
+	Mat4 rotate(float z) noexcept {
+		Mat4 result{};
+		result(0,0) = std::cos(z);
+		result(1,0) = -std::sin(z);
+		result(0,1) = -result(1,0);
+		result(1,1) = result(0,0);
+		result(2,2) = 1.0f;
+		result(3,3) = 1.0f;
 		return result;
 	}
 

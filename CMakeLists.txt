@@ -15,6 +15,15 @@ else()
     set(PLATFORM_FILES code/platform_linux.cpp)
 endif()
 
+if(NOT MINGW)
+    set(RESOURCE_FILE "")
+else()
+    execute_process(COMMAND windres --input ${CMAKE_SOURCE_DIR}/mingw_res.rc --output ${CMAKE_SOURCE_DIR}/_resource.res --output-format=coff WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    add_library(resource_file OBJECT IMPORTED)
+    set_target_properties(resource_file PROPERTIES IMPORTED_OBJECTS ${CMAKE_SOURCE_DIR}/_resource.res)
+    set(RESOURCE_FILE $<TARGET_OBJECTS:resource_file>)
+endif()
+
 add_executable(tanks
     code/main.cpp
     code/platform.hpp
@@ -28,6 +37,7 @@ add_executable(tanks
     code/math.hpp
     code/math.cpp
     ${PLATFORM_FILES}
+    ${RESOURCE_FILE}
 )
 
 target_compile_features(tanks PRIVATE cxx_std_20)

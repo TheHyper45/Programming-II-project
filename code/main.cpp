@@ -20,7 +20,7 @@ int main() {
         auto start_time = std::chrono::steady_clock::now();
         while(!platform.window_closed()) {
             auto end_time = std::chrono::steady_clock::now();
-            float delta_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count() / 1000000.0f;
+            float delta_time = float(std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count()) / 1000000.0f;
             start_time = end_time;
 
             platform.process_events();
@@ -28,14 +28,15 @@ int main() {
                 std::cout << "FPS: " << (1.0f / delta_time) << std::endl;
             }
             if(platform.was_key_pressed(core::Keycode::Right)) {
-                if(tile_index < 8) tile_index += 1;
+                if(tile_index < 63) tile_index += 1;
             }
             if(platform.was_key_pressed(core::Keycode::Left)) {
                 if(tile_index > 0) tile_index -= 1;
             }
 
             renderer.begin(0.0f,0.0f,0.0f);
-            renderer.draw_sprite({core::Background_Tile_Count_X / 2.0f - 4,core::Background_Tile_Count_Y / 2.0f - 4},{8,8},tiles_sprite_atlas,tile_index);
+            renderer.draw_sprite({0.5f,0.5f},{0.5f,0.5f},0,tiles_sprite_atlas,0);
+            renderer.draw_sprite({core::Background_Tile_Count_X / 2.0f,core::Background_Tile_Count_Y / 2.0f},{8,8},0,tiles_sprite_atlas,tile_index);
             renderer.end();
             platform.swap_window_buffers();
         }

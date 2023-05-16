@@ -13,9 +13,6 @@
 #include "exceptions.hpp"
 
 namespace core {
-	static constexpr std::size_t Scene_Data_Uniform_Buffer_Size = 16384;
-	static char info_log_buffer[4096];
-
 	struct Object_Data {
 		alignas(16) Mat4 matrix;
 		alignas(16) std::uint32_t texture_index;
@@ -36,10 +33,11 @@ namespace core {
 		GLuint sprite_vertex_array_id;
 		GLuint sprite_buffer_id;
 		std::vector<Sprite> sprites;
+		std::size_t object_data_uniform_buffer_size;
 	};
 
 	static constexpr const char Vertex_Shader_Source_Format[] = R"xxx(
-		#version 420 core
+		#version 430 core
 		in vec3 position;
 		in vec2 tex_coords;
 		out vec2 out_tex_coords;
@@ -50,7 +48,7 @@ namespace core {
 			uint texture_index;
 		};
 		layout(std140,binding = 0) uniform Scene_Data {
-			Object_Data[204] object_datas;
+			Object_Data[%zu] object_datas;
 		};
 		void main() {
 			gl_Position = projection_matrix * object_datas[gl_InstanceID].matrix * vec4(position,1.0);
@@ -60,13 +58,15 @@ namespace core {
 	)xxx";
 
 	static constexpr const char Fragment_Shader_Source_Format[] = R"xxx(
-		#version 420 core
+		#version 430 core
 		in vec2 out_tex_coords;
 		in flat uint out_texture_index;
 		out vec4 out_color;
 		uniform sampler2DArray sprite_textures;
 		void main() {
-			out_color = texture(sprite_textures,vec3(out_tex_coords,float(out_texture_index)));
+			vec4 color = texture(sprite_textures,vec3(out_tex_coords,float(out_texture_index)));
+			if(color.a < 0.5) discard;
+			out_color = color;
 		}
 	)xxx";
 
@@ -107,7 +107,7 @@ namespace core {
 		}
 	}
 
-	static void APIENTRY debug_message_callback(GLenum source,GLenum type,GLuint id,GLenum severity,[[maybe_unused]] GLsizei message_length,const GLchar* message,const void*) {
+	static void APIENTRY debug_message_callback(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei,const GLchar* message,const void*) {
 		std::cerr << "[OpenGL] Source: " << core::opengl_debug_source_to_string(source) <<
 					 ", type: " << core::opengl_debug_type_to_string(type) <<
 					 ", id: " << id <<
@@ -133,6 +133,13 @@ namespace core {
 		glDebugMessageControl(GL_DONT_CARE,GL_DONT_CARE,GL_DONT_CARE,0,nullptr,GL_TRUE);
 		glDebugMessageCallback(&debug_message_callback,nullptr);
 #endif
+		{
+			data.object_data_uniform_buffer_size = 16384;
+			GLint64 max_uniform_buffer_size = 0;
+			glGetInteger64v(GL_MAX_UNIFORM_BLOCK_SIZE,&max_uniform_buffer_size);
+			if(max_uniform_buffer_size < 65536) data.object_data_uniform_buffer_size = max_uniform_buffer_size;
+			else data.object_data_uniform_buffer_size = 65536;
+		}
 
 		auto create_shader = [&](GLenum type,const char* type_string,const char* source,std::size_t source_byte_length){
 			GLuint shader = glCreateShader(type);
@@ -145,6 +152,7 @@ namespace core {
 			GLint status = 0;
 			glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
 			if(!status) {
+				static char info_log_buffer[4096];
 				GLsizei msg_byte_length = 0;
 				glGetShaderInfoLog(shader,sizeof(info_log_buffer) - 1,&msg_byte_length,info_log_buffer);
 				glDeleteShader(shader);
@@ -154,7 +162,12 @@ namespace core {
 		};
 
 		{
-			GLuint vertex_shader = create_shader(GL_VERTEX_SHADER,"GL_VERTEX_SHADER",Vertex_Shader_Source_Format,sizeof(Vertex_Shader_Source_Format) - 1);
+			char vertex_shader_formatted_source[4096] = {};
+			int format_result = std::snprintf(vertex_shader_formatted_source,sizeof(vertex_shader_formatted_source) - 1,
+											  Vertex_Shader_Source_Format,data.object_data_uniform_buffer_size / sizeof(Object_Data));
+			if(format_result < 0) throw Runtime_Exception("Couldn't preprocess the vertex shader source.");
+
+			GLuint vertex_shader = create_shader(GL_VERTEX_SHADER,"GL_VERTEX_SHADER",vertex_shader_formatted_source,sizeof(vertex_shader_formatted_source) - 1);
 			defer[&]{glDeleteShader(vertex_shader);};
 
 			GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER,"GL_FRAGMENT_SHADER",Fragment_Shader_Source_Format,sizeof(Fragment_Shader_Source_Format) - 1);
@@ -174,6 +187,7 @@ namespace core {
 			GLint status = 0;
 			glGetProgramiv(data.shader_program,GL_LINK_STATUS,&status);
 			if(!status) {
+				static char info_log_buffer[4096];
 				GLsizei msg_byte_length = 0;
 				glGetProgramInfoLog(data.shader_program,sizeof(info_log_buffer) - 1,&msg_byte_length,info_log_buffer);
 				glDeleteProgram(data.shader_program);
@@ -192,19 +206,19 @@ namespace core {
 			glBindBuffer(GL_ARRAY_BUFFER,data.sprite_buffer_id);
 
 			static constexpr Vertex Sprite_Vertices[] = {
-				{{0.0f,0.0f},{0.0f,0.0f}},
-				{{1.0f,0.0f},{1.0f,0.0f}},
-				{{1.0f,1.0f},{1.0f,1.0f}},
-				{{0.0f,0.0f},{0.0f,0.0f}},
-				{{1.0f,1.0f},{1.0f,1.0f}},
-				{{0.0f,1.0f},{0.0f,1.0f}},
+				{{-0.5f,-0.5f},{0.0f,0.0f}},
+				{{ 0.5f,-0.5f},{1.0f,0.0f}},
+				{{ 0.5f, 0.5f},{1.0f,1.0f}},
+				{{-0.5f,-0.5f},{0.0f,0.0f}},
+				{{ 0.5f, 0.5f},{1.0f,1.0f}},
+				{{-0.5f, 0.5f},{0.0f,1.0f}},
 			};
 
 			glBufferData(GL_ARRAY_BUFFER,sizeof(Sprite_Vertices),Sprite_Vertices,GL_STATIC_DRAW);
 
 			GLint64 actual_buffer_size = 0;
 			glGetBufferParameteri64v(GL_ARRAY_BUFFER,GL_BUFFER_SIZE,&actual_buffer_size);
-			if(actual_buffer_size != sizeof(Sprite_Vertices)) throw Runtime_Exception("Couldn't allocate background tiles buffer memory.");
+			if(std::size_t(actual_buffer_size) != sizeof(Sprite_Vertices)) throw Runtime_Exception("Couldn't allocate quad vertex buffer memory.");
 
 			glGenVertexArrays(1,&data.sprite_vertex_array_id);
 			glBindVertexArray(data.sprite_vertex_array_id);
@@ -238,9 +252,7 @@ namespace core {
 	Renderer::~Renderer() { destroy(); }
 
 	void Renderer::begin(float r,float g,float b) {
-		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 		if(platform->window_resized()) adjust_viewport();
-
 		glClearColor(r,g,b,1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
@@ -248,78 +260,73 @@ namespace core {
 	void Renderer::end() {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 		for(auto& sprite : data.sprites) {
-			if(!sprite.has_value) continue;
+			if(!sprite.has_value || sprite.current_object_data_index == 0) continue;
 			glBindBufferBase(GL_UNIFORM_BUFFER,0,sprite.scene_data_uniform_buffer);
 			glBufferSubData(GL_UNIFORM_BUFFER,0,sprite.current_object_data_index * sizeof(Object_Data),sprite.object_datas.data());
 			glBindTexture(GL_TEXTURE_2D_ARRAY,sprite.texture_id);
-			glDrawArraysInstanced(GL_TRIANGLES,0,6,sprite.current_object_data_index);
+			glDrawArraysInstanced(GL_TRIANGLES,0,6,GLsizei(sprite.current_object_data_index));
 			sprite.current_object_data_index = 0;
 		}
-		glDrawArrays(GL_TRIANGLES,0,6);
 	}
 
-	void Renderer::draw_sprite(Vec2 position,Vec2 size,const Sprite_Index& sprite_index,std::uint32_t tile_index) {
+	void Renderer::draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t tile_index) {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
-		if(sprite_index.index >= data.sprites.size()) {
 #if defined(DEBUG_BUILD)
+		if(sprite_index.index >= data.sprites.size()) {
 			std::cerr << "[Rendering] Invalid sprite index (index: " << sprite_index.index << ", generation: " << sprite_index.generation << ")." << std::endl;
 			return;
-#else
-			throw Runtime_Exception("Invalid sprite index (out of bounds).");
-#endif
 		}
 		Sprite& sprite = data.sprites[sprite_index.index];
 		if(sprite.generation != sprite_index.generation || !sprite.has_value) {
-#if defined(DEBUG_BUILD)
 			std::cerr << "[Rendering] Invalid sprite index (index: " << sprite_index.index << ", generation: " << sprite_index.generation << ")." << std::endl;
 			return;
-#else
-			throw Runtime_Exception("Invalid sprite index (outdated).");
-#endif
 		}
 		if(tile_index >= sprite.array_layers) {
-#if defined(DEBUG_BUILD)
 			std::cerr << "[Rendering] Invalid sprite tile index (" << tile_index << ")." << std::endl;
 			return;
-#else
-			throw Runtime_Exception("Invalid sprite tile index.");
-#endif
 		}
+#else
+		if(sprite_index.index >= data.sprites.size()) throw Runtime_Exception("Invalid sprite index (out of bounds).");
+		Sprite& sprite = data.sprites[sprite_index.index];
+		if(sprite.generation != sprite_index.generation || !sprite.has_value) throw Runtime_Exception("Invalid sprite index (outdated).");
+		if(tile_index >= sprite.array_layers) throw Runtime_Exception("Invalid sprite tile index.");
+#endif
 
 		if((sprite.current_object_data_index + 1) >= sprite.object_datas.size()) {
 			glBindBufferBase(GL_UNIFORM_BUFFER,0,sprite.scene_data_uniform_buffer);
 			glBufferSubData(GL_UNIFORM_BUFFER,0,sprite.current_object_data_index * sizeof(Object_Data),sprite.object_datas.data());
 			glBindTexture(GL_TEXTURE_2D_ARRAY,sprite.texture_id);
-			glDrawArraysInstanced(GL_TRIANGLES,0,6,sprite.current_object_data_index);
+			glDrawArraysInstanced(GL_TRIANGLES,0,6,GLsizei(sprite.current_object_data_index));
 			sprite.current_object_data_index = 0;
 		}
-		sprite.object_datas[sprite.current_object_data_index].matrix = core::translate(position.x,position.y,0) * core::scale(size.x,size.y,1);
+		sprite.object_datas[sprite.current_object_data_index].matrix = core::translate(position.x,position.y,position.z) * core::rotate(rotation) * core::scale(size.x,size.y,1);
 		sprite.object_datas[sprite.current_object_data_index].texture_index = tile_index;
 		sprite.current_object_data_index += 1;
 	}
 
 	[[nodiscard]] static std::vector<std::uint8_t> load_bitmap_from_file(const char* file_path,std::uint32_t* out_width,std::uint32_t* out_height) {
-		std::strcpy(info_log_buffer,file_path);
+		static char static_file_path[2048];
+		std::strcpy(static_file_path,file_path);
 
 		auto file = std::ifstream(file_path,std::ios::binary);
-		if(!file.is_open()) throw File_Open_Exception(info_log_buffer);
+		if(!file.is_open()) throw File_Open_Exception(static_file_path);
 
 		auto read = [&]<typename T>() {
 			T value = T();
-			if(!file.read(reinterpret_cast<char*>(&value),sizeof(value))) throw File_Read_Exception(info_log_buffer,sizeof(value));
+			if(!file.read(reinterpret_cast<char*>(&value),sizeof(value))) throw File_Read_Exception(static_file_path,sizeof(value));
 			return value;
 		};
 
 		char magic_bytes[2] = {};
-		if(!file.read(magic_bytes,2)) throw File_Read_Exception(info_log_buffer,2);
-		if(magic_bytes[0] != 'B' || magic_bytes[1] != 'M') throw File_Exception(info_log_buffer,"Invalid magic bytes at the beginning");
+		if(!file.read(magic_bytes,2)) throw File_Read_Exception(static_file_path,2);
+		if(magic_bytes[0] != 'B' || magic_bytes[1] != 'M') throw File_Exception(static_file_path,"Invalid magic bytes at the beginning");
 
-		auto bitmap_file_size = read.operator()<std::uint32_t>();
-		auto reserved_data = read.operator()<std::uint32_t>();
+		[[maybe_unused]] auto bitmap_file_size = read.operator()<std::uint32_t>();
+		[[maybe_unused]] auto reserved_data = read.operator()<std::uint32_t>();
 		auto pixel_data_offset = read.operator()<std::uint32_t>();
 
 		auto info_header_size = read.operator()<std::uint32_t>();
-		if(info_header_size != 124) throw File_Exception(info_log_buffer,"Only BITMAPV5HEADER is supported");
+		if(info_header_size != 124) throw File_Exception(static_file_path,"Only BITMAPV5HEADER is supported");
 
 		auto width = read.operator()<std::int32_t>();
 		auto height = read.operator()<std::int32_t>();
@@ -327,13 +334,13 @@ namespace core {
 		if(height <= 0) throw Runtime_Exception("Height must be > 0");
 
 		auto plane_count = read.operator()<std::uint16_t>();
-		if(plane_count != 1) throw File_Exception(info_log_buffer,"Plane count must be 1");
+		if(plane_count != 1) throw File_Exception(static_file_path,"Plane count must be 1");
 
 		auto bit_count = read.operator()<std::uint16_t>();
-		if(bit_count != 32) throw File_Exception(info_log_buffer,"Bit count must be 32");
+		if(bit_count != 32) throw File_Exception(static_file_path,"Bit count must be 32");
 
 		auto compression_method_index = read.operator()<std::uint32_t>();
-		if(compression_method_index != 3) throw File_Exception(info_log_buffer,"Compression must be BI_BITFIELDS");
+		if(compression_method_index != 3) throw File_Exception(static_file_path,"Compression must be BI_BITFIELDS");
 
 		[[maybe_unused]] auto image_size = read.operator()<std::uint32_t>();
 		[[maybe_unused]] auto hor_resolution = read.operator()<std::int32_t>();
@@ -347,13 +354,14 @@ namespace core {
 		auto alpha_mask = read.operator()<std::uint32_t>();
 
 		//BITMAPV5HEADER has more fields, but we are ignoring them for simplicity.
-		if(!file.seekg(pixel_data_offset,std::ios::beg)) throw File_Seek_Exception(info_log_buffer,pixel_data_offset);
+		if(!file.seekg(pixel_data_offset,std::ios::beg)) throw File_Seek_Exception(static_file_path,pixel_data_offset);
 
 		std::vector<std::uint8_t> pixels{};
 		pixels.resize(std::size_t(width) * height * 4);
 		//BMP files are stored fliped around the X axis so we need to read it backwards.
-		for(std::uint32_t y = 0;y < height;y += 1) {
-			if(!file.read(reinterpret_cast<char*>(&pixels[(std::size_t(height) - y - 1) * width * 4]),std::size_t(width) * 4)) throw File_Read_Exception(info_log_buffer,std::size_t(width) * 4);
+		for(std::uint32_t y = 0;y < std::uint32_t(height);y += 1) {
+			if(!file.read(reinterpret_cast<char*>(&pixels[(std::size_t(height) - y - 1) * width * 4]),std::size_t(width) * 4))
+				throw File_Read_Exception(static_file_path,std::size_t(width) * 4);
 		}
 
 		for(std::size_t i = 0;i < pixels.size();i += 4) {
@@ -391,12 +399,12 @@ namespace core {
 		GLuint uniform_buffer_id = 0;
 		glGenBuffers(1,&uniform_buffer_id);
 		glBindBuffer(GL_UNIFORM_BUFFER,uniform_buffer_id);
-		glBufferData(GL_UNIFORM_BUFFER,Scene_Data_Uniform_Buffer_Size,nullptr,GL_DYNAMIC_DRAW);
+		glBufferData(GL_UNIFORM_BUFFER,data.object_data_uniform_buffer_size,nullptr,GL_DYNAMIC_DRAW);
 
 		try {
 			GLint64 actual_size = 0;
 			glGetBufferParameteri64v(GL_UNIFORM_BUFFER,GL_BUFFER_SIZE,&actual_size);
-			if(Scene_Data_Uniform_Buffer_Size != actual_size) throw Runtime_Exception("Couldn't allocate an uniform buffer.");
+			if(data.object_data_uniform_buffer_size != std::size_t(actual_size)) throw Runtime_Exception("Couldn't allocate an uniform buffer.");
 			return insert_sprite(texture_id,uniform_buffer_id,1);
 		}
 		catch(...) {
@@ -434,6 +442,7 @@ namespace core {
 			std::vector<std::uint8_t> tmp_pixels = {};
 			tmp_pixels.resize(std::size_t(tile_dimension) * tile_dimension * 4);
 
+			//The code below extracts sprites from an atlas and each sprite is put as a seperate array layer.
 			for(std::uint32_t base_y = 0;base_y < height;base_y += tile_dimension) {
 				for(std::uint32_t x = 0;x < width;x += tile_dimension) {
 					std::uint32_t offset = 0;
@@ -448,11 +457,11 @@ namespace core {
 
 			glGenBuffers(1,&uniform_buffer_id);
 			glBindBuffer(GL_UNIFORM_BUFFER,uniform_buffer_id);
-			glBufferData(GL_UNIFORM_BUFFER,Scene_Data_Uniform_Buffer_Size,nullptr,GL_DYNAMIC_DRAW);
+			glBufferData(GL_UNIFORM_BUFFER,data.object_data_uniform_buffer_size,nullptr,GL_DYNAMIC_DRAW);
 
 			GLint64 actual_size = 0;
 			glGetBufferParameteri64v(GL_UNIFORM_BUFFER,GL_BUFFER_SIZE,&actual_size);
-			if(Scene_Data_Uniform_Buffer_Size != actual_size) throw Runtime_Exception("Couldn't allocate an uniform buffer.");
+			if(data.object_data_uniform_buffer_size != std::size_t(actual_size)) throw Runtime_Exception("Couldn't allocate an uniform buffer.");
 			return insert_sprite(texture_id,uniform_buffer_id,tile_count_x * tile_count_y);
 		}
 		catch(...) {
@@ -485,7 +494,7 @@ namespace core {
 		sprite.scene_data_uniform_buffer = uniform_buffer_id;
 		sprite.array_layers = array_layers;
 		sprite.current_object_data_index = 0;
-		sprite.object_datas.resize(204);
+		sprite.object_datas.resize(data.object_data_uniform_buffer_size / sizeof(Object_Data));
 		data.sprites.push_back(std::move(sprite));
 		return {data.sprites.size() - 1,1};
 	}

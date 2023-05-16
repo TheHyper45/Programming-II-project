@@ -31,7 +31,7 @@ namespace core {
 		~Renderer();
 		void begin(float r,float g,float b);
 		void end();
-		void draw_sprite(Vec2 position,Vec2 size,const Sprite_Index& sprite_index,std::uint32_t tile_index = 0);
+		void draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t tile_index = 0);
 		[[nodiscard]] Sprite_Index sprite(const char* file_path);
 		[[nodiscard]] Sprite_Index sprite_atlas(const char* file_path,std::uint32_t tile_dimension);
 	private:

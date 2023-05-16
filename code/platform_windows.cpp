@@ -214,7 +214,7 @@ namespace core {
 				return 0;
 			}
 			case WM_CHAR: {
-				//std::cout << wparam << std::endl;
+				std::cout << "WM_CHAR: " << wparam << std::endl;
 				return 0;
 			}
 		}
@@ -301,7 +301,7 @@ namespace core {
 		{
 			static constexpr int Context_Attributes[] = {
 				WGL_CONTEXT_MAJOR_VERSION_ARB,4,
-				WGL_CONTEXT_MINOR_VERSION_ARB,3,
+				WGL_CONTEXT_MINOR_VERSION_ARB,6,
 				WGL_CONTEXT_PROFILE_MASK_ARB,WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 				WGL_CONTEXT_FLAGS_ARB,WGL_CONTEXT_DEBUG_BIT_ARB,
 				Array_End_Marker
@@ -314,12 +314,12 @@ namespace core {
 
 		static constexpr int Context_Attributes[] = {
 			WGL_CONTEXT_MAJOR_VERSION_ARB,4,
-			WGL_CONTEXT_MINOR_VERSION_ARB,3,
+			WGL_CONTEXT_MINOR_VERSION_ARB,6,
 			WGL_CONTEXT_PROFILE_MASK_ARB,WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 			Array_End_Marker
 		};
 		HGLRC ctx = wglCreateContextAttribsARB(data.dc,nullptr,Context_Attributes);
-		if(!ctx) throw Runtime_Exception("Your computer doesn't support OpenGL 4.3 core.");
+		if(!ctx) throw Runtime_Exception("Your computer doesn't support OpenGL 4.6 core.");
 		return ctx;
 	}
 
