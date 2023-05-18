@@ -15,6 +15,7 @@ namespace core {
 		std::uint32_t y;
 	};
 
+	//Since C++ still doesn't have reflection, this trick lets us implement 'keycode_to_string' function without having to manually write all of the keycode names.
 #define CORE_KEYCODES(MACRO)\
 	MACRO(Unknown)\
 	MACRO(Num_0)\
@@ -169,8 +170,11 @@ namespace core {
 		[[nodiscard]] bool is_key_down(Keycode code) const noexcept;
 		[[nodiscard]] bool was_key_pressed(Keycode code) const noexcept;
 		[[nodiscard]] Point mouse_position() const noexcept;
+		//This is not necessary but I think that making renderer's constructor private is better code-wise to acknowledge that renderers are derived from platforms.
 		[[nodiscard]] Renderer create_renderer();
 	private:
+		/*	An object of type 'Platform_Windows_Data' is placement-newed inside this array internally.
+			This is to avoid having to include all of the headers that would be required to make this work. */
 		alignas(std::max_align_t) unsigned char data_buffer[512];
 	};
 }

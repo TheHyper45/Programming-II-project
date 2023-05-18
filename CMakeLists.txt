@@ -18,6 +18,9 @@ endif()
 if(NOT MINGW)
     set(RESOURCE_FILE "")
 else()
+    #[[ When using GCC on Windows, including the manifest file in an executable is different than including such manifest when using MSVC.
+        When using MSVC, you just supply the linker with the manifest file.
+        When using GCC, you have to compile that manifest into a *.res file that is then linked together with your object files. ]]
     string(REPLACE "/" "\\" TMP_PATH ${CMAKE_SOURCE_DIR})
     file(WRITE ${CMAKE_BINARY_DIR}\\_resource.rc "#include \"winuser.h\"\n1 RT_MANIFEST ${TMP_PATH}\\win32app.manifest")
     execute_process(COMMAND windres --input "${CMAKE_BINARY_DIR}\\_resource.rc" --output "${CMAKE_BINARY_DIR}\\_resource.res" --output-format=coff WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

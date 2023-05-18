@@ -292,6 +292,8 @@ namespace core {
 		if(tile_index >= sprite.array_layers) throw Runtime_Exception("Invalid sprite tile index.");
 #endif
 
+		//We render sprites by putting their transformation and texture data inside an uniform buffer designated for the texture we use in rendering.
+		//When that buffers is full or at the end of a frame, we render all of the sprites that use a particular texture at once using instancing.
 		if((sprite.current_object_data_index + 1) >= sprite.object_datas.size()) {
 			glBindBufferBase(GL_UNIFORM_BUFFER,0,sprite.scene_data_uniform_buffer);
 			glBufferSubData(GL_UNIFORM_BUFFER,0,sprite.current_object_data_index * sizeof(Object_Data),sprite.object_datas.data());
@@ -387,6 +389,7 @@ namespace core {
 		std::cout << "[Rendering] Loading an image from file \"" << file_path << "\" (width: " << width << ", height: " << height << ")." << std::endl;
 #endif
 
+		//We use 'GL_TEXTURE_2D_ARRAY' instead of 'GL_TEXTURE_2D' to simplify shaders.
 		GLuint texture_id = 0;
 		glGenTextures(1,&texture_id);
 		glBindTexture(GL_TEXTURE_2D_ARRAY,texture_id);
@@ -396,6 +399,7 @@ namespace core {
 		glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
 		glTexImage3D(GL_TEXTURE_2D_ARRAY,0,GL_RGBA,width,height,1,0,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
 
+		//Each texture has its own uniform buffer for storing data related to quads rendered with the texture.
 		GLuint uniform_buffer_id = 0;
 		glGenBuffers(1,&uniform_buffer_id);
 		glBindBuffer(GL_UNIFORM_BUFFER,uniform_buffer_id);
@@ -502,6 +506,8 @@ namespace core {
 	void Renderer::adjust_viewport() {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 
+		//Since the game is always in 4/3 aspect ratio, this piece of code calculates an appropriate offset from either the left side or the top side depending on current window resolution.
+		//There will be black (or any other color being used as a clear color) horizontal or vertical bars depending on the aspect ratio of the window.
 		auto dims = platform->window_client_dimensions();
 		std::uint32_t offset_x = 0,offset_y = 0;
 		if(dims.width * 3 >= dims.height * 4) {

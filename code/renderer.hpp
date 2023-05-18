@@ -32,10 +32,14 @@ namespace core {
 		void begin(float r,float g,float b);
 		void end();
 		void draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t tile_index = 0);
+
+		//Texture are freed the moment rendering engine is destroyed.
 		[[nodiscard]] Sprite_Index sprite(const char* file_path);
 		[[nodiscard]] Sprite_Index sprite_atlas(const char* file_path,std::uint32_t tile_dimension);
 	private:
 		Platform* platform;
+		/*	An object of type 'Renderer_Internal_Data' is placement-newed inside this array internally.
+			This is to avoid having to include all of the headers that would be required to make this work. */
 		alignas(std::max_align_t) unsigned char data_buffer[128];
 		friend class Platform;
 	};

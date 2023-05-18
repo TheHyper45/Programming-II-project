@@ -18,7 +18,7 @@
 
 namespace core {
 	static constexpr const char* Window_Class_Name = "CustomWindowClass";
-	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_CAPTION | WS_SIZEBOX | WS_MINIMIZEBOX | WS_VISIBLE;
+	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_CAPTION | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_VISIBLE;
 	static constexpr int Array_End_Marker = 0;
 
 	const char* keycode_to_string(Keycode code) {
@@ -214,7 +214,7 @@ namespace core {
 				return 0;
 			}
 			case WM_CHAR: {
-				std::cout << "WM_CHAR: " << wparam << std::endl;
+				//std::cout << "WM_CHAR: " << wparam << std::endl;
 				return 0;
 			}
 		}
@@ -236,10 +236,10 @@ namespace core {
 	}
 
 	[[nodiscard]] static HGLRC create_opengl_context(Platform_Windows_Data& data) {
-		//OpenGL initialization on Windows is really weird.
-		//If you want to use newer versions of OpenGL you have to use 'wglChoosePixelFormatARB' and 'wglCreateContextAttribsARB' to create a context.
-		//But to get function pointers to these functions you have to use 'wglGetProcAddress' which only works if you already have a context.
-		//So we need to create an invisible window, initialize OpenGL the old way, get function pointers, create the proper window and destroy the temporary window.
+		/*	OpenGL initialization on Windows is really weird.
+			If you want to use newer versions of OpenGL you have to use 'wglChoosePixelFormatARB' and 'wglCreateContextAttribsARB' to create a context.
+			But to get function pointers to these functions you have to use 'wglGetProcAddress' which only works if you already have a context.
+			So we need to create an invisible window, initialize OpenGL the old way, get function pointers, create the proper window and destroy the temporary window. */
 
 		HWND temp_window = CreateWindowExA(0,Window_Class_Name,"Temporary",WS_POPUP,0,0,1,1,HWND_DESKTOP,nullptr,GetModuleHandleA(nullptr),nullptr);
 		if(!temp_window) throw Runtime_Exception("Couldn't create a temporary window.");
@@ -361,6 +361,7 @@ namespace core {
 		if(!opengl32_lib) throw Runtime_Exception("Couldn't load OpenGL32.dll.");
 		defer[&]{FreeLibrary(opengl32_lib);};
 		
+		//OpenGL 1.x function have to be loaded with 'GetProcAddress'. Newer functions have to be loaded with 'wglGetProcAddress'.
 #define OPENGL_LOAD_FUNC(TYPE,NAME) \
 	do {\
 		NAME = reinterpret_cast<TYPE>(wglGetProcAddress(#NAME));\
