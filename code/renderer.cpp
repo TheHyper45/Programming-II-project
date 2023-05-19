@@ -35,6 +35,7 @@ namespace core {
 		GLuint sprite_buffer_id;
 		std::vector<Sprite> sprites;
 		std::size_t object_data_uniform_buffer_size;
+		Sprite_Index font_sprite;
 	};
 
 	static constexpr const char Vertex_Shader_Source_Format[] = R"xxx(
@@ -236,6 +237,7 @@ namespace core {
 			glVertexAttribPointer(tex_coords_location,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3 * sizeof(float)));
 		}
 		adjust_viewport();
+		data.font_sprite = sprite_atlas("./assets/font_16x16.bmp",16);
 	}
 	catch(...) { destroy(); throw; }
 
@@ -317,6 +319,21 @@ namespace core {
 		object_data.texture_index = tile_index;
 		object_data.multiply_color = {color.x,color.y,color.z,1};
 		sprite.current_object_data_index += 1;
+	}
+
+	void Renderer::draw_text(Vec3 position,Vec2 char_size,Vec3 color,const char* text) {
+		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
+		Vec3 cur_pos = position;
+		for(;*text;text += 1) {
+			char c = *text;
+			if(c == '\n') {
+				cur_pos.x = position.x;
+				cur_pos.y += char_size.y;
+				continue;
+			}
+			draw_sprite_colored(cur_pos,char_size,0,color,data.font_sprite,std::uint32_t(c));
+			cur_pos.x += char_size.x;
+		}
 	}
 
 	[[nodiscard]] static std::vector<std::uint8_t> load_bitmap_from_file(const char* file_path,std::uint32_t* out_width,std::uint32_t* out_height) {
