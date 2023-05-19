@@ -14,6 +14,12 @@ namespace core {
 		float y;
 		float z;
 	};
+	struct Vec4 {
+		float x;
+		float y;
+		float z;
+		float w;
+	};
 	struct Mat4 {
 		float data[16];
 		Mat4() = default;

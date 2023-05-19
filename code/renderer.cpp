@@ -16,6 +16,7 @@ namespace core {
 	struct Object_Data {
 		alignas(16) Mat4 matrix;
 		alignas(16) std::uint32_t texture_index;
+		alignas(16) Vec4 multiply_color;
 	};
 
 	struct Sprite {
@@ -42,10 +43,12 @@ namespace core {
 		in vec2 tex_coords;
 		out vec2 out_tex_coords;
 		out flat uint out_texture_index;
+		out vec4 out_multiply_color;
 		uniform mat4 projection_matrix;
 		struct Object_Data {
 			mat4 matrix;
 			uint texture_index;
+			vec4 multiply_color;
 		};
 		layout(std140,binding = 0) uniform Scene_Data {
 			Object_Data[%zu] object_datas;
@@ -54,6 +57,7 @@ namespace core {
 			gl_Position = projection_matrix * object_datas[gl_InstanceID].matrix * vec4(position,1.0);
 			out_tex_coords = tex_coords;
 			out_texture_index = object_datas[gl_InstanceID].texture_index;
+			out_multiply_color = object_datas[gl_InstanceID].multiply_color;
 		}
 	)xxx";
 
@@ -61,16 +65,17 @@ namespace core {
 		#version 430 core
 		in vec2 out_tex_coords;
 		in flat uint out_texture_index;
+		in vec4 out_multiply_color;
 		out vec4 out_color;
 		uniform sampler2DArray sprite_textures;
 		void main() {
-			vec4 color = texture(sprite_textures,vec3(out_tex_coords,float(out_texture_index)));
+			vec4 color = out_multiply_color * texture(sprite_textures,vec3(out_tex_coords,float(out_texture_index)));
 			if(color.a < 0.5) discard;
 			out_color = color;
 		}
 	)xxx";
 
-	[[nodiscard]] static const char* opengl_debug_source_to_string(GLenum value) {
+	[[nodiscard]] static const char* opengl_debug_source_to_string(GLenum value) noexcept {
 		switch(value) {
 			case GL_DEBUG_SOURCE_API: return "GL_DEBUG_SOURCE_API";
 			case GL_DEBUG_SOURCE_WINDOW_SYSTEM: return "GL_DEBUG_SOURCE_WINDOW_SYSTEM";
@@ -82,7 +87,7 @@ namespace core {
 		}
 	}
 
-	[[nodiscard]] static const char* opengl_debug_type_to_string(GLenum value) {
+	[[nodiscard]] static const char* opengl_debug_type_to_string(GLenum value) noexcept {
 		switch(value) {
 			case GL_DEBUG_TYPE_ERROR: return "GL_DEBUG_TYPE_ERROR";
 			case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: return "GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR";
@@ -97,7 +102,7 @@ namespace core {
 		}
 	}
 
-	[[nodiscard]] static const char* opengl_debug_severity_to_string(GLenum value) {
+	[[nodiscard]] static const char* opengl_debug_severity_to_string(GLenum value) noexcept {
 		switch(value) {
 			case GL_DEBUG_SEVERITY_LOW: return "GL_DEBUG_SEVERITY_LOW";
 			case GL_DEBUG_SEVERITY_MEDIUM: return "GL_DEBUG_SEVERITY_MEDIUM";
@@ -134,11 +139,12 @@ namespace core {
 		glDebugMessageCallback(&debug_message_callback,nullptr);
 #endif
 		{
-			data.object_data_uniform_buffer_size = 16384;
+			data.object_data_uniform_buffer_size = 16384; //OpenGL implementations don't have to support uniform buffers larger than 16384 bytes in size.
 			GLint64 max_uniform_buffer_size = 0;
 			glGetInteger64v(GL_MAX_UNIFORM_BLOCK_SIZE,&max_uniform_buffer_size);
-			if(max_uniform_buffer_size < 65536) data.object_data_uniform_buffer_size = max_uniform_buffer_size;
-			else data.object_data_uniform_buffer_size = 65536;
+			static constexpr std::size_t Desired_Uniform_Buffer_Size = 65536;
+			if(std::size_t(max_uniform_buffer_size) < Desired_Uniform_Buffer_Size) data.object_data_uniform_buffer_size = max_uniform_buffer_size;
+			else data.object_data_uniform_buffer_size = Desired_Uniform_Buffer_Size;
 		}
 
 		auto create_shader = [&](GLenum type,const char* type_string,const char* source,std::size_t source_byte_length){
@@ -270,6 +276,10 @@ namespace core {
 	}
 
 	void Renderer::draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t tile_index) {
+		draw_sprite_colored(position,size,rotation,{1,1,1},sprite_index,tile_index);
+	}
+
+	void Renderer::draw_sprite_colored(Vec3 position,Vec2 size,float rotation,Vec3 color,const Sprite_Index& sprite_index,std::uint32_t tile_index) {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 #if defined(DEBUG_BUILD)
 		if(sprite_index.index >= data.sprites.size()) {
@@ -301,8 +311,11 @@ namespace core {
 			glDrawArraysInstanced(GL_TRIANGLES,0,6,GLsizei(sprite.current_object_data_index));
 			sprite.current_object_data_index = 0;
 		}
-		sprite.object_datas[sprite.current_object_data_index].matrix = core::translate(position.x,position.y,position.z) * core::rotate(rotation) * core::scale(size.x,size.y,1);
-		sprite.object_datas[sprite.current_object_data_index].texture_index = tile_index;
+
+		auto& object_data = sprite.object_datas[sprite.current_object_data_index];
+		object_data.matrix = core::translate(position.x,position.y,position.z) * core::rotate(rotation) * core::scale(size.x,size.y,1);
+		object_data.texture_index = tile_index;
+		object_data.multiply_color = {color.x,color.y,color.z,1};
 		sprite.current_object_data_index += 1;
 	}
 
@@ -361,10 +374,9 @@ namespace core {
 		std::vector<std::uint8_t> pixels{};
 		pixels.resize(std::size_t(width) * height * 4);
 		//BMP files are stored fliped around the X axis so we need to read it backwards.
-		for(std::uint32_t y = 0;y < std::uint32_t(height);y += 1) {
+		for(std::uint32_t y = 0;y < std::uint32_t(height);y += 1)
 			if(!file.read(reinterpret_cast<char*>(&pixels[(std::size_t(height) - y - 1) * width * 4]),std::size_t(width) * 4))
 				throw File_Read_Exception(static_file_path,std::size_t(width) * 4);
-		}
 
 		for(std::size_t i = 0;i < pixels.size();i += 4) {
 			std::uint32_t value = (std::uint32_t(pixels[i + 3]) << 24u) | (std::uint32_t(pixels[i + 2]) << 16u) | (std::uint32_t(pixels[i + 1]) << 8u) | (std::uint32_t(pixels[i + 0]) << 0u);

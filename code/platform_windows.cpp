@@ -333,7 +333,7 @@ namespace core {
 		wc.hIcon = LoadIconA(nullptr,IDI_APPLICATION);
 		wc.hIconSm = wc.hIcon;
 		wc.lpfnWndProc = &core::window_proc;
-		wc.cbWndExtra = sizeof(Platform_Windows_Data*) + sizeof(LONG_PTR);
+		wc.cbWndExtra = sizeof(Platform_Windows_Data*) + sizeof(LONG_PTR); //If you use 'wc.cbWndExtra', you have to add 'sizeof(LONG_PTR)' to it, otherwise it won't work.
 		if(!RegisterClassExA(&wc)) throw Runtime_Exception("Couldn't register window class.");
 
 		data.window_client_dims = {client_width,client_height};
