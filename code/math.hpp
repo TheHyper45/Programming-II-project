@@ -20,6 +20,12 @@ namespace core {
 		float z;
 		float w;
 	};
+	struct Rect {
+		float x;
+		float y;
+		float width;
+		float height;
+	};
 	struct Mat4 {
 		float data[16];
 		Mat4() = default;

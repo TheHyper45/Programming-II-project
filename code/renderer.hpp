@@ -23,7 +23,7 @@ namespace core {
 	class Renderer {
 		void destroy() noexcept;
 		void adjust_viewport();
-		[[nodiscard]] Sprite_Index insert_sprite(unsigned int texture_id,unsigned int uniform_buffer_id,std::uint32_t array_layers);
+		[[nodiscard]] Sprite_Index insert_sprite(unsigned int texture_id,unsigned int uniform_buffer_id,std::uint32_t array_layers,std::uint32_t layer_size);
 		explicit Renderer(Platform* _platform);
 	public:
 		Renderer(const Renderer&) = delete;
@@ -34,6 +34,7 @@ namespace core {
 		void draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t tile_index = 0);
 		void draw_sprite_colored(Vec3 position,Vec2 size,float rotation,Vec3 color,const Sprite_Index& sprite_index,std::uint32_t tile_index = 0);
 		void draw_text(Vec3 position,Vec2 char_size,Vec3 color,const char* text);
+		[[nodiscard]] Rect compute_text_dims(Vec3 position,Vec2 char_size,const char* text);
 
 		//Texture are freed the moment rendering engine is destroyed.
 		[[nodiscard]] Sprite_Index sprite(const char* file_path);

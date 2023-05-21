@@ -1,4 +1,5 @@
 #include <new>
+#include <cctype>
 #include <cstdio>
 #include <vector>
 #include <cstring>
@@ -6,6 +7,8 @@
 #include <iomanip>
 #include <iostream>
 #include <optional>
+#include <cinttypes>
+#include <filesystem>
 #include "defer.hpp"
 #include "opengl.hpp"
 #include "renderer.hpp"
@@ -27,6 +30,13 @@ namespace core {
 		std::vector<Object_Data> object_datas;
 		std::size_t current_object_data_index;
 		std::uint32_t array_layers;
+		std::uint32_t layer_size;
+	};
+
+	struct Font_Character_Info {
+		std::uint32_t x_offset;
+		std::uint32_t y_baseline_offset;
+		std::uint32_t x_advance;
 	};
 
 	struct Renderer_Internal_Data {
@@ -36,6 +46,8 @@ namespace core {
 		std::vector<Sprite> sprites;
 		std::size_t object_data_uniform_buffer_size;
 		Sprite_Index font_sprite;
+		std::vector<Font_Character_Info> font_character_infos;
+		std::uint32_t font_largest_y_baseline_offset;
 	};
 
 	static constexpr const char Vertex_Shader_Source_Format[] = R"xxx(
@@ -238,6 +250,40 @@ namespace core {
 		}
 		adjust_viewport();
 		data.font_sprite = sprite_atlas("./assets/font_16x16.bmp",16);
+		{
+			static constexpr const char* Font_Info_File_Path = "./assets/font_16x16.txt";
+			auto file = std::ifstream(Font_Info_File_Path,std::ios::binary);
+			if(!file.is_open()) throw File_Open_Exception(Font_Info_File_Path);
+
+			std::size_t file_size = std::filesystem::file_size(Font_Info_File_Path);
+
+			std::vector<char> text{};
+			text.resize(file_size + 1); //Add 1 for the null-terminator.
+
+			if(!file.read(text.data(),file_size)) throw File_Read_Exception(Font_Info_File_Path,file_size);
+			text[text.size() - 1] = '\0';
+			file.close();
+
+			data.font_character_infos.reserve(128);
+			for(std::size_t i = 0;i < text.size();i += 1) {
+				if(std::isdigit(static_cast<unsigned char>(text[i]))) {
+					Font_Character_Info info = {};
+					int count = std::sscanf(&text[i],"%" PRIu32 " %" PRIu32 " %" PRIu32,&info.x_offset,&info.y_baseline_offset,&info.x_advance);
+					if(count < 0) throw File_Exception(Font_Info_File_Path,"Invalid format.");
+					i += std::size_t(count);
+					if(data.font_largest_y_baseline_offset < info.y_baseline_offset) data.font_largest_y_baseline_offset = info.y_baseline_offset;
+					data.font_character_infos.push_back(info);
+				}
+				for(std::size_t j = i;j < text.size();j += 1) {
+					if(text[j] == '\n') {
+						i = j;
+						goto end_of_loop;
+					}
+				}
+				i = text.size() - 1;
+			end_of_loop:;
+			}
+		}
 	}
 	catch(...) { destroy(); throw; }
 
@@ -323,17 +369,58 @@ namespace core {
 
 	void Renderer::draw_text(Vec3 position,Vec2 char_size,Vec3 color,const char* text) {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
+		float layer_size = float(data.sprites[data.font_sprite.index].layer_size);
+		float font_largest_y_baseline_offset = (float(data.font_largest_y_baseline_offset) / layer_size) * char_size.y;
+
 		Vec3 cur_pos = position;
 		for(;*text;text += 1) {
 			char c = *text;
 			if(c == '\n') {
 				cur_pos.x = position.x;
-				cur_pos.y += char_size.y;
+				cur_pos.y += char_size.y + font_largest_y_baseline_offset;
 				continue;
 			}
-			draw_sprite_colored(cur_pos,char_size,0,color,data.font_sprite,std::uint32_t(c));
-			cur_pos.x += char_size.x;
+			auto& info = data.font_character_infos[std::size_t(c)];
+			float y_baseline_offset = (float(info.y_baseline_offset) / layer_size) * char_size.y;
+
+			Vec3 new_pos = cur_pos;
+			new_pos.x -= (float(info.x_offset) / layer_size) * char_size.x;
+			new_pos.y += y_baseline_offset;
+			draw_sprite_colored(new_pos,char_size,0,color,data.font_sprite,std::uint32_t(c));
+			cur_pos.x += (float(info.x_advance) / layer_size) * char_size.x + 1.0f / layer_size;
 		}
+	}
+
+	Rect Renderer::compute_text_dims(Vec3 position,Vec2 char_size,const char* text) {
+		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
+		float layer_size = float(data.sprites[data.font_sprite.index].layer_size);
+		float layer_size_reci = 1.0f / layer_size;
+		float font_largest_y_baseline_offset = (float(data.font_largest_y_baseline_offset) / layer_size) * char_size.y;
+
+		Rect dims = {position.x,position.y,0,char_size.y};
+		float current_x = position.x;
+		std::uint32_t newline_count = 0;
+		float potential_height_increment = 0.0f;
+		for(;*text;text += 1) {
+			char c = *text;
+			if(c == '\n') {
+				newline_count += 1;
+				current_x = position.x;
+				dims.height = newline_count * (char_size.y + font_largest_y_baseline_offset) + char_size.y;
+				potential_height_increment = 0.0f;
+				continue;
+			}
+			auto& info = data.font_character_infos[std::size_t(c)];
+
+			current_x += (float(info.x_advance) / layer_size) * char_size.x + layer_size_reci;
+			float diff = current_x - position.x;
+			if(diff > dims.width) dims.width = diff;
+
+			float y_baseline_offset = (float(info.y_baseline_offset) / layer_size) * char_size.y;
+			if(potential_height_increment < y_baseline_offset) potential_height_increment = y_baseline_offset;
+		}
+		dims.height += potential_height_increment;
+		return dims;
 	}
 
 	[[nodiscard]] static std::vector<std::uint8_t> load_bitmap_from_file(const char* file_path,std::uint32_t* out_width,std::uint32_t* out_height) {
@@ -438,7 +525,7 @@ namespace core {
 			GLint64 actual_size = 0;
 			glGetBufferParameteri64v(GL_UNIFORM_BUFFER,GL_BUFFER_SIZE,&actual_size);
 			if(data.object_data_uniform_buffer_size != std::size_t(actual_size)) throw Runtime_Exception("Couldn't allocate an uniform buffer.");
-			return insert_sprite(texture_id,uniform_buffer_id,1);
+			return insert_sprite(texture_id,uniform_buffer_id,1,0);
 		}
 		catch(...) {
 			glDeleteBuffers(1,&uniform_buffer_id);
@@ -495,7 +582,7 @@ namespace core {
 			GLint64 actual_size = 0;
 			glGetBufferParameteri64v(GL_UNIFORM_BUFFER,GL_BUFFER_SIZE,&actual_size);
 			if(data.object_data_uniform_buffer_size != std::size_t(actual_size)) throw Runtime_Exception("Couldn't allocate an uniform buffer.");
-			return insert_sprite(texture_id,uniform_buffer_id,tile_count_x * tile_count_y);
+			return insert_sprite(texture_id,uniform_buffer_id,tile_count_x * tile_count_y,tile_dimension);
 		}
 		catch(...) {
 			if(glIsBuffer(uniform_buffer_id)) glDeleteBuffers(1,&uniform_buffer_id);
@@ -504,7 +591,7 @@ namespace core {
 		}
 	}
 
-	Sprite_Index Renderer::insert_sprite(unsigned int texture_id,unsigned int uniform_buffer_id,std::uint32_t array_layers) {
+	Sprite_Index Renderer::insert_sprite(unsigned int texture_id,unsigned int uniform_buffer_id,std::uint32_t array_layers,std::uint32_t layer_size) {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 
 		for(std::size_t i = 0;i < data.sprites.size();i += 1) {
@@ -515,6 +602,7 @@ namespace core {
 				sprite.texture_id = texture_id;
 				sprite.scene_data_uniform_buffer = uniform_buffer_id;
 				sprite.array_layers = array_layers;
+				sprite.layer_size = layer_size;
 				sprite.current_object_data_index = 0;
 				return {i,sprite.generation};
 			}
@@ -526,6 +614,7 @@ namespace core {
 		sprite.texture_id = texture_id;
 		sprite.scene_data_uniform_buffer = uniform_buffer_id;
 		sprite.array_layers = array_layers;
+		sprite.layer_size = layer_size;
 		sprite.current_object_data_index = 0;
 		sprite.object_datas.resize(data.object_data_uniform_buffer_size / sizeof(Object_Data));
 		data.sprites.push_back(std::move(sprite));
