@@ -29,10 +29,10 @@ namespace core {
 		Renderer(const Renderer&) = delete;
 		Renderer& operator=(const Renderer&) = delete;
 		~Renderer();
-		void begin(float r,float g,float b);
+		void begin(float delta_time,Vec3 color = {});
 		void end();
-		void draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t tile_index = 0);
-		void draw_sprite_colored(Vec3 position,Vec2 size,float rotation,Vec3 color,const Sprite_Index& sprite_index,std::uint32_t tile_index = 0);
+		void draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t sprite_layer_index = 0);
+		void draw_sprite(Vec3 position,Vec2 size,float rotation,Vec4 color,bool rainbow_effect,const Sprite_Index& sprite_index,std::uint32_t sprite_layer_index = 0);
 		void draw_text(Vec3 position,Vec2 char_size,Vec3 color,const char* text);
 		[[nodiscard]] Rect compute_text_dims(Vec3 position,Vec2 char_size,const char* text);
 

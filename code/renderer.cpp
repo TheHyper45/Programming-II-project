@@ -16,10 +16,12 @@
 #include "exceptions.hpp"
 
 namespace core {
+	//Using 'std140' layout in shaders, requires every member be aligned to 16 bytes.
 	struct Object_Data {
 		alignas(16) Mat4 matrix;
 		alignas(16) std::uint32_t texture_index;
 		alignas(16) Vec4 multiply_color;
+		alignas(16) std::uint32_t effect_id;
 	};
 
 	struct Sprite {
@@ -48,20 +50,24 @@ namespace core {
 		Sprite_Index font_sprite;
 		std::vector<Font_Character_Info> font_character_infos;
 		std::uint32_t font_largest_y_baseline_offset;
+		GLint time_uniform_location;
+		float time;
 	};
 
 	static constexpr const char Vertex_Shader_Source_Format[] = R"xxx(
-		#version 430 core
+		#version 460 core
 		in vec3 position;
 		in vec2 tex_coords;
 		out vec2 out_tex_coords;
 		out flat uint out_texture_index;
 		out vec4 out_multiply_color;
+		out flat uint out_effect_id;
 		uniform mat4 projection_matrix;
 		struct Object_Data {
 			mat4 matrix;
 			uint texture_index;
 			vec4 multiply_color;
+			uint effect_id;
 		};
 		layout(std140,binding = 0) uniform Scene_Data {
 			Object_Data[%zu] object_datas;
@@ -71,20 +77,27 @@ namespace core {
 			out_tex_coords = tex_coords;
 			out_texture_index = object_datas[gl_InstanceID].texture_index;
 			out_multiply_color = object_datas[gl_InstanceID].multiply_color;
+			out_effect_id = object_datas[gl_InstanceID].effect_id;
 		}
 	)xxx";
 
 	static constexpr const char Fragment_Shader_Source_Format[] = R"xxx(
-		#version 430 core
+		#version 460 core
 		in vec2 out_tex_coords;
 		in flat uint out_texture_index;
 		in vec4 out_multiply_color;
+		in flat uint out_effect_id;
 		out vec4 out_color;
 		uniform sampler2DArray sprite_textures;
+		uniform float time;
 		void main() {
 			vec4 color = out_multiply_color * texture(sprite_textures,vec3(out_tex_coords,float(out_texture_index)));
 			if(color.a < 0.5) discard;
-			out_color = color;
+			if(out_effect_id == 0) out_color = color;
+			else {
+				float tmp = (out_tex_coords.x + out_tex_coords.y) / 2.0 + time * 3.0;
+				out_color = color * vec4(abs(sin(tmp)),abs(sin(tmp + 1)),abs(sin(tmp + 2)),1.0);
+			}
 		}
 	)xxx";
 
@@ -216,6 +229,7 @@ namespace core {
 		glUseProgram(data.shader_program);
 		glActiveTexture(GL_TEXTURE0);
 		glUniform1i(glGetUniformLocation(data.shader_program,"sprite_textures"),0);
+		data.time_uniform_location = glGetUniformLocation(data.shader_program,"time");
 
 		GLint position_location = glGetAttribLocation(data.shader_program,"position");
 		GLint tex_coords_location = glGetAttribLocation(data.shader_program,"tex_coords");
@@ -305,10 +319,13 @@ namespace core {
 
 	Renderer::~Renderer() { destroy(); }
 
-	void Renderer::begin(float r,float g,float b) {
+	void Renderer::begin(float delta_time,Vec3 color) {
+		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 		if(platform->window_resized()) adjust_viewport();
-		glClearColor(r,g,b,1.0f);
+		glClearColor(color.x,color.y,color.z,1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		data.time += delta_time;
+		glUniform1f(data.time_uniform_location,data.time);
 	}
 
 	void Renderer::end() {
@@ -323,11 +340,11 @@ namespace core {
 		}
 	}
 
-	void Renderer::draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t tile_index) {
-		draw_sprite_colored(position,size,rotation,{1,1,1},sprite_index,tile_index);
+	void Renderer::draw_sprite(Vec3 position,Vec2 size,float rotation,const Sprite_Index& sprite_index,std::uint32_t sprite_layer_index) {
+		draw_sprite(position,size,rotation,{1,1,1,1},false,sprite_index,sprite_layer_index);
 	}
 
-	void Renderer::draw_sprite_colored(Vec3 position,Vec2 size,float rotation,Vec3 color,const Sprite_Index& sprite_index,std::uint32_t tile_index) {
+	void Renderer::draw_sprite(Vec3 position,Vec2 size,float rotation,Vec4 color,bool rainbow_effect,const Sprite_Index& sprite_index,std::uint32_t sprite_layer_index) {
 		Renderer_Internal_Data& data = *std::launder(reinterpret_cast<Renderer_Internal_Data*>(data_buffer));
 #if defined(DEBUG_BUILD)
 		if(sprite_index.index >= data.sprites.size()) {
@@ -339,15 +356,15 @@ namespace core {
 			std::cerr << "[Rendering] Invalid sprite index (index: " << sprite_index.index << ", generation: " << sprite_index.generation << ")." << std::endl;
 			return;
 		}
-		if(tile_index >= sprite.array_layers) {
-			std::cerr << "[Rendering] Invalid sprite tile index (" << tile_index << ")." << std::endl;
+		if(sprite_layer_index >= sprite.array_layers) {
+			std::cerr << "[Rendering] Invalid sprite tile index (" << sprite_layer_index << ")." << std::endl;
 			return;
 		}
 #else
 		if(sprite_index.index >= data.sprites.size()) throw Runtime_Exception("Invalid sprite index (out of bounds).");
 		Sprite& sprite = data.sprites[sprite_index.index];
 		if(sprite.generation != sprite_index.generation || !sprite.has_value) throw Runtime_Exception("Invalid sprite index (outdated).");
-		if(tile_index >= sprite.array_layers) throw Runtime_Exception("Invalid sprite tile index.");
+		if(sprite_layer_index >= sprite.array_layers) throw Runtime_Exception("Invalid sprite tile index.");
 #endif
 
 		//We render sprites by putting their transformation and texture data inside an uniform buffer designated for the texture we use in rendering.
@@ -362,8 +379,9 @@ namespace core {
 
 		auto& object_data = sprite.object_datas[sprite.current_object_data_index];
 		object_data.matrix = core::translate(position.x,position.y,position.z) * core::rotate(rotation) * core::scale(size.x,size.y,1);
-		object_data.texture_index = tile_index;
-		object_data.multiply_color = {color.x,color.y,color.z,1};
+		object_data.texture_index = sprite_layer_index;
+		object_data.multiply_color = color;
+		object_data.effect_id = std::uint32_t(rainbow_effect);
 		sprite.current_object_data_index += 1;
 	}
 
@@ -386,7 +404,7 @@ namespace core {
 			Vec3 new_pos = cur_pos;
 			new_pos.x -= (float(info.x_offset) / layer_size) * char_size.x;
 			new_pos.y += y_baseline_offset;
-			draw_sprite_colored(new_pos,char_size,0,color,data.font_sprite,std::uint32_t(c));
+			draw_sprite(new_pos,char_size,0.0f,data.font_sprite,std::uint32_t(c));
 			cur_pos.x += (float(info.x_advance) / layer_size) * char_size.x + 1.0f / layer_size;
 		}
 	}

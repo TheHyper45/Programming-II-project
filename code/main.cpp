@@ -34,11 +34,8 @@ int main() {
                 if(tile_index > 0) tile_index -= 1;
             }
 
-            renderer.begin(0.0f,0.0f,0.0f);
+            renderer.begin(delta_time);
             renderer.draw_sprite({0.5f,0.5f},{1.0f,1.0f},0,tiles_sprite_atlas,4);
-            renderer.draw_sprite_colored({1.5f,0.5f},{1.0f,1.0f},0,{1,0,0},tiles_sprite_atlas,4);
-            renderer.draw_sprite_colored({2.5f,0.5f},{1.0f,1.0f},0,{0,1,0},tiles_sprite_atlas,4);
-            renderer.draw_sprite_colored({3.5f,0.5f},{1.0f,1.0f},0,{0,0,1},tiles_sprite_atlas,4);
             renderer.draw_sprite({core::Background_Tile_Count_X / 2.0f,core::Background_Tile_Count_Y / 2.0f},{8,8},0,tiles_sprite_atlas,tile_index);
             renderer.end();
             platform.swap_window_buffers();
