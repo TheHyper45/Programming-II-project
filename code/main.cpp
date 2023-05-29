@@ -84,4 +84,5 @@ int main() {
         platform.error_message_box("Unknown exception type. Sorry for screwing up :(.");
         return 1;
     }
+
 }
