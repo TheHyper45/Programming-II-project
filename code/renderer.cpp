@@ -404,7 +404,7 @@ namespace core {
 			Vec3 new_pos = cur_pos;
 			new_pos.x -= (float(info.x_offset) / layer_size) * char_size.x;
 			new_pos.y += y_baseline_offset;
-			draw_sprite(new_pos,char_size,0.0f,data.font_sprite,std::uint32_t(c));
+			draw_sprite(new_pos,char_size,0.0f,{color.x,color.y,color.z,1.0f},false,data.font_sprite,std::uint32_t(c));
 			cur_pos.x += (float(info.x_advance) / layer_size) * char_size.x + 1.0f / layer_size;
 		}
 	}
