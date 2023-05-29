@@ -7,9 +7,9 @@
 namespace core {
 	enum class Scene {
 		Main_Menu,
-		Select_Lecel_1player,
+		Select_Level_1player,
 		Game_1player,
-		Select_Lecel_2player,
+		Select_Level_2player,
 		Game_2player,
 		Construction,
 	};
