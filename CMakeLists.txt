@@ -42,6 +42,8 @@ add_executable(tanks
     code/opengl.hpp
     code/math.hpp
     code/math.cpp
+    code/game.hpp
+    code/game.cpp
     ${PLATFORM_FILES}
     ${RESOURCE_FILE}
 )
