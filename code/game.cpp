@@ -28,6 +28,35 @@ namespace core {
 	pole mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = { 2, 1, Tile_flag::Below };
 	pole* pointertomap;
 	//pole polemap[Background_Tile_Count_X*2][Background_Tile_Count_Y*2]
+	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	{
+		int toenumint;
+		std::ofstream save;
+		save.open(filename, std::ios::out);
+		if (save.good())
+		{
+			for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
+			{
+				for (int j = 0; j < Background_Tile_Count_X * 2; j++)
+				{
+					//save << "{";
+					save << polemap[i][j].sprite_layer_index << ",";
+					save << polemap[i][j].health << ",";
+					toenumint = static_cast<int>(polemap[i][j].flag);
+					//save << toenumint << "}";
+					//save << polemap[i][j].flag;
+					save << ";";
+
+				}
+			}
+
+		}
+		else
+		{
+			exit(EXIT_FAILURE);
+		}
+		save.close();
+	}
 	void SaveMenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
 	{
 		int savechoice = 1;
@@ -58,25 +87,67 @@ namespace core {
 		}
 		}
 	}
-	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
-	{
-		int toenumint;
-		std::ofstream save;
-		save.open(filename, std::ios::out);
-		if (save.good())
-		{
-			for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
-			{
-				for (int j = 0; j < Background_Tile_Count_X * 2; j++)
-				{
-					//save << "{";
-					save << polemap[i][j].sprite_layer_index << ",";
-					save << polemap[i][j].health << ",";
-					toenumint = static_cast<int>(polemap[i][j].flag);
-					//save << toenumint << "}";
-					//save << polemap[i][j].flag;
-					save << ";";
 
+	pole mapload(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2], std::string mapchoice)
+	{
+
+		std::ifstream load;
+		load.open(mapchoice);
+		std::string readdata, readhealth, readflag, readindex;
+		int passedindex, passedhealth;
+
+		Tile_flag passedflag;
+		if (load.good())
+		{
+			if (load.eof())
+			{
+				exit;
+			}
+			else
+			{
+				for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
+				{
+					for (int j = 0; j < Background_Tile_Count_X * 2; j++)
+					{
+						getline(load, readdata, ',');
+						readindex = readdata;
+						getline(load, readdata, ',');
+						readhealth = readdata;
+						getline(load, readdata, ';');
+						readflag = readdata;
+						passedindex = std::stoi(readindex);
+						passedhealth = std::stoi(readhealth);
+						if (readflag == "Solid")
+						{
+							passedflag = Tile_flag::Solid;
+						}
+						else if (readflag == "Below")
+						{
+							passedflag = Tile_flag::Below;
+						}
+						else if (readflag == "Above")
+						{
+							passedflag = Tile_flag::Above;
+						}
+						else if (readflag == "Bulletpass")
+						{
+							passedflag = Tile_flag::Bulletpass;
+						}
+						else
+						{
+							passedflag = Tile_flag::Barrier;
+						}
+						polemap[i][j].sprite_layer_index = passedindex;
+						polemap[i][j].health = passedhealth;
+						polemap[i][j].flag = passedflag;
+						/*
+		Solid,
+		Below,
+		Above,
+		Bulletpass,
+		Barrier,
+						*/
+					}
 				}
 			}
 
@@ -85,8 +156,9 @@ namespace core {
 		{
 			exit(EXIT_FAILURE);
 		}
-		save.close();
+		return polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
 	}
+
 	pole loadmenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
 	{
 		int loadsavedorloadmap;
@@ -143,76 +215,7 @@ namespace core {
 		
 		
 	}
-	pole mapload(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2],std::string mapchoice)
-	{
-		
-		std::ifstream load;
-		load.open(mapchoice);
-		std::string readdata, readhealth, readflag, readindex; 
-		int passedindex, passedhealth;
-		
-		Tile_flag passedflag;
-		if (load.good())
-		{
-			if (load.eof())
-			{
-				exit;
-			}
-			else
-			{
-				for (int i = 0; i < Background_Tile_Count_Y*2; i++)
-				{
-					for (int j = 0; j < Background_Tile_Count_X*2; j++)
-					{
-						getline(load, readdata, ',');
-						readindex = readdata;
-						getline(load, readdata, ',');
-						readhealth = readdata;
-						getline(load, readdata, ';');
-						readflag = readdata;
-						passedindex = std::stoi(readindex);
-						passedhealth = std::stoi(readhealth);
-						if (readflag == "Solid")
-						{
-							passedflag =Tile_flag::Solid;
-						}
-						else if (readflag == "Below")
-						{
-							passedflag = Tile_flag::Below;
-						}
-						else if (readflag == "Above")
-						{
-							passedflag = Tile_flag::Above;
-						}
-						else if (readflag == "Bulletpass")
-						{
-							passedflag = Tile_flag::Bulletpass;
-						}
-						else
-						{
-							passedflag = Tile_flag::Barrier;
-						}
-						polemap[i][j].sprite_layer_index = passedindex;
-						polemap[i][j].health = passedhealth;
-						polemap[i][j].flag = passedflag;
-						/*
-		Solid,
-		Below,
-		Above,
-		Bulletpass,
-		Barrier,
-						*/
-					}
-				}
-			}
-			
-		}
-		else
-		{
-			exit(EXIT_FAILURE);
-		}
-		return polemap[Background_Tile_Count_X*2][Background_Tile_Count_Y*2];
-	}
+	
 
 	void Game::graphics() {
 		switch (scene) {
