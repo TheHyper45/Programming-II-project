@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include "renderer.hpp"
 #include "platform.hpp"
+#include <fstream>
+#include <string>
+
 
 namespace core {
 	enum class Scene {
