@@ -3,49 +3,20 @@
 #include "math.hpp"
 #include <stdio.h>
 #include "bullets.hpp"
+#include <list>
 
 #define number_of_choices 3
 using namespace std;
 namespace core {
-<<<<<<< HEAD
 	core::Game::Tank tank;
 	std::list<Bullet> List_Of_Bullets{};
-	Game::Game(Renderer* _renderer,Platform* _platform) :
-		renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),menu_choice() {
-		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
-=======
 	Game::Game(Renderer* _renderer, Platform* _platform) :
 		renderer(_renderer), platform(_platform), scene(Scene::Main_Menu), menu_choice() {
 		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16);
->>>>>>> 6150d3e9556c360a186e3a3b0af5ad95d971bdca
-		menu_choice = 0;
 	}
-
 	void Game::menu() {
 		menu_choice = 0;
 	}
-<<<<<<< HEAD
-	void Game::Game_1player() {
-		enum class Tile_flag { //creation of map
-			Solid,
-			Below,
-			Above,
-			Bulletpass,
-			Barrier,
-
-		};
-		struct pole {
-			std::uint32_t sprite_layer_index;
-			std::uint32_t health;
-			Tile_flag flag;
-		};
-		pole tab[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = {
-			{2,1,Tile_flag::Below}
-		};
-
-		
-
-=======
 
 	enum class Tile_flag
 	{
@@ -247,12 +218,9 @@ namespace core {
 			default:
 				break;
 			}
-		}
+		};
+	};
 		
-		
->>>>>>> 6150d3e9556c360a186e3a3b0af5ad95d971bdca
-	}
-	
 
 	void Game::graphics(float delta_time) {
 		switch (scene) {
@@ -353,8 +321,8 @@ namespace core {
 			break;
 		case Scene::Select_Level_1player:
 			if (platform->was_key_pressed(core::Keycode::Return)) {
-				Game_1player();
-
+				//Game_1player();
+				
 				scene = Scene::Game_1player;
 			}
 			break;
