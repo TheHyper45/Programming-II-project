@@ -5,6 +5,7 @@
 #include <cstddef>
 
 namespace core {
+	static inline constexpr float PI = 3.1415927f;
 	struct Vec2 {
 		float x;
 		float y;
@@ -13,6 +14,9 @@ namespace core {
 		float x;
 		float y;
 		float z;
+		[[nodiscard]] explicit operator Vec2() {
+			return { x,y };
+		}
 	};
 	struct Vec4 {
 		float x;

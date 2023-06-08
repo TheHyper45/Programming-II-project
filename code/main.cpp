@@ -26,9 +26,9 @@ int main() {
             
             platform.process_events();
             game.logic();
-
+            
             renderer.begin(delta_time);
-            game.graphics();
+            game.graphics(delta_time);
             renderer.end();
             platform.swap_window_buffers();
         }
