@@ -7,17 +7,24 @@
 #define number_of_choices 3
 using namespace std;
 namespace core {
+<<<<<<< HEAD
 	core::Game::Tank tank;
 	std::list<Bullet> List_Of_Bullets{};
 	Game::Game(Renderer* _renderer,Platform* _platform) :
 		renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),menu_choice() {
 		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
+=======
+	Game::Game(Renderer* _renderer, Platform* _platform) :
+		renderer(_renderer), platform(_platform), scene(Scene::Main_Menu), menu_choice() {
+		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16);
+>>>>>>> 6150d3e9556c360a186e3a3b0af5ad95d971bdca
 		menu_choice = 0;
 	}
 
 	void Game::menu() {
 		menu_choice = 0;
 	}
+<<<<<<< HEAD
 	void Game::Game_1player() {
 		enum class Tile_flag { //creation of map
 			Solid,
@@ -38,6 +45,212 @@ namespace core {
 
 		
 
+=======
+
+	enum class Tile_flag
+	{
+		Solid,
+		Below,
+		Above,
+		Bulletpass,
+		Barrier,
+	};
+	struct pole
+	{
+		std::uint32_t sprite_layer_index;
+		std::uint32_t health;
+		Tile_flag flag;
+	};
+	pole mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = { 2, 1, Tile_flag::Below };
+	pole* pointertomap;
+	//pole polemap[Background_Tile_Count_X*2][Background_Tile_Count_Y*2]
+	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	{
+		int toenumint;
+		std::ofstream save;
+		save.open(filename, std::ios::out);
+		if (save.good())
+		{
+			for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
+			{
+				for (int j = 0; j < Background_Tile_Count_X * 2; j++)
+				{
+					//save << "{";
+					save << polemap[i][j].sprite_layer_index << ",";
+					save << polemap[i][j].health << ",";
+					toenumint = static_cast<int>(polemap[i][j].flag);
+					//save << toenumint << "}";
+					//save << polemap[i][j].flag;
+					save << ";";
+
+				}
+			}
+
+		}
+		else
+		{
+			exit(EXIT_FAILURE);
+		}
+		save.close();
+	}
+	void SaveMenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	{
+		int savechoice = 1;
+		
+		std::string filename;
+		
+		switch (savechoice)
+		{
+		case 1:
+		{
+			filename = "savefile1.txt";
+			SaveMap(filename, polemap);
+
+		}
+		case 2 :
+		{
+			filename = "savefile2.txt";
+			SaveMap(filename, polemap);
+		}
+		case 3:
+		{
+			filename = "savefile3.txt";
+			SaveMap(filename, polemap);
+		}
+		default:
+		{
+			break;
+		}
+		}
+	}
+
+	pole mapload(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2], std::string mapchoice)
+	{
+
+		std::ifstream load;
+		load.open(mapchoice);
+		std::string readdata, readhealth, readflag, readindex;
+		int passedindex, passedhealth;
+
+		Tile_flag passedflag;
+		if (load.good())
+		{
+			if (load.eof())
+			{
+				exit;
+			}
+			else
+			{
+				for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
+				{
+					for (int j = 0; j < Background_Tile_Count_X * 2; j++)
+					{
+						getline(load, readdata, ',');
+						readindex = readdata;
+						getline(load, readdata, ',');
+						readhealth = readdata;
+						getline(load, readdata, ';');
+						readflag = readdata;
+						passedindex = std::stoi(readindex);
+						passedhealth = std::stoi(readhealth);
+						if (readflag == "Solid")
+						{
+							passedflag = Tile_flag::Solid;
+						}
+						else if (readflag == "Below")
+						{
+							passedflag = Tile_flag::Below;
+						}
+						else if (readflag == "Above")
+						{
+							passedflag = Tile_flag::Above;
+						}
+						else if (readflag == "Bulletpass")
+						{
+							passedflag = Tile_flag::Bulletpass;
+						}
+						else
+						{
+							passedflag = Tile_flag::Barrier;
+						}
+						polemap[i][j].sprite_layer_index = passedindex;
+						polemap[i][j].health = passedhealth;
+						polemap[i][j].flag = passedflag;
+						/*
+		Solid,
+		Below,
+		Above,
+		Bulletpass,
+		Barrier,
+						*/
+					}
+				}
+			}
+
+		}
+		else
+		{
+			exit(EXIT_FAILURE);
+		}
+		return polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
+	}
+
+	pole loadmenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	{
+		int loadsavedorloadmap;
+		std::string mapchoice;
+		int mapchoiceint = 0;
+		if (loadsavedorloadmap == 1)
+		{
+			switch (mapchoiceint)
+
+			{
+			case 1:
+			{
+				mapchoice = "map1.txt";
+				return mapload(polemap, mapchoice);
+			}
+			case 2:
+			{
+				mapchoice = "map2.txt";
+				return mapload(polemap, mapchoice);
+			}
+			case 3:
+			{
+				mapchoice = "map3.txt";
+				return mapload(polemap, mapchoice);
+			}
+			default:
+				break;
+			}
+		}
+		else
+		{
+			switch (mapchoiceint)
+
+			{
+			case 1:
+			{
+				mapchoice = "savefile1.txt";
+				mapload(polemap, mapchoice);
+			}
+			case 2:
+			{
+				mapchoice = "savefile1.txt";
+				mapload(polemap, mapchoice);
+			}
+			case 3:
+			{
+				mapchoice = "savefile1.txt";
+				mapload(polemap, mapchoice);
+			}
+			default:
+				break;
+			}
+		}
+		
+		
+>>>>>>> 6150d3e9556c360a186e3a3b0af5ad95d971bdca
 	}
 	
 

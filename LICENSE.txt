@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2023 Dawid "TheHyper45" Michalak, Kacper "KasmyrA" Smyrak
+Copyright (c) 2023 Dawid "TheHyper45" Michalak, Kacper "KasmyrA" Smyrak, Bartłomiej "MFSTL1" Piłot
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

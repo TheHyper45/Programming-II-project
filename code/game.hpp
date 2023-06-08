@@ -2,7 +2,14 @@
 #define GAME_HPP
 #include "renderer.hpp"
 #include "platform.hpp"
+<<<<<<< HEAD
 #include <list>
+=======
+#include <fstream>
+#include <string>
+
+
+>>>>>>> 6150d3e9556c360a186e3a3b0af5ad95d971bdca
 namespace core {
 	enum class Scene {
 		Main_Menu,
