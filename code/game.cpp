@@ -32,9 +32,16 @@ namespace core {
 		std::uint32_t health;
 		Tile_flag flag;
 	};
+	struct playerstatus
+	{
+		float x;
+		float y;
+		float z;
+		float rotation;
+		float direction;
+	};
 	pole mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = { 2, 1, Tile_flag::Below };
-	pole* pointertomap;
-	//pole polemap[Background_Tile_Count_X*2][Background_Tile_Count_Y*2]
+	playerstatus playerstatus1= { 0,0,0,0,0 };
 	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
 	{
 		int toenumint;
@@ -64,29 +71,60 @@ namespace core {
 		}
 		save.close();
 	}
-	void SaveMenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	void savePlayerStatus(core::Game::Tank tank, string filename2)
+	{
+		float x, y, z, direction, rotation;
+		x = tank.position.x;
+		y = tank.position.y;
+		z = tank.position.z;
+		rotation = tank.rotation;
+		direction = tank.direction;
+		std::ofstream savestatus;
+		savestatus.open(filename2, std::ios::out);
+		if (savestatus.good())
+		{
+			savestatus << x << ",";
+			savestatus << y << ",";
+			savestatus << z << ",";
+			savestatus << direction << ",";
+			savestatus << rotation << ".";
+		}
+		else
+		{
+			exit(EXIT_FAILURE);
+		}
+		savestatus.close();
+
+	}
+	void SaveMenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2], core::Game::Tank tank)
 	{
 		int savechoice = 1;
 		
-		std::string filename;
+		std::string filename,filename2;
 		
 		switch (savechoice)
 		{
 		case 1:
 		{
 			filename = "savefile1.txt";
+			filename2 = "statussave1.txt";
 			SaveMap(filename, polemap);
+			savePlayerStatus(tank, filename2);
 
 		}
 		case 2 :
 		{
 			filename = "savefile2.txt";
+			filename2 = "statussave2.txt";
 			SaveMap(filename, polemap);
+			savePlayerStatus(tank, filename2);
 		}
 		case 3:
 		{
 			filename = "savefile3.txt";
+			filename2 = "statussave3.txt";
 			SaveMap(filename, polemap);
+			savePlayerStatus(tank, filename2);
 		}
 		default:
 		{
@@ -94,7 +132,8 @@ namespace core {
 		}
 		}
 	}
-
+	
+	
 	pole mapload(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2], std::string mapchoice)
 	{
 
@@ -165,12 +204,76 @@ namespace core {
 		}
 		return polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
 	}
-
-	pole loadmenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	playerstatus loadstatus(std::string mapchoice ,playerstatus loaddata)
+	{
+		float x;
+		std::string readdata;
+		
+		std::ifstream loadstatus;
+		loadstatus.open(mapchoice);
+		if (loadstatus.good())
+		{
+			if (loadstatus.eof())
+			{
+				exit;
+			}
+			else
+			{
+				getline(loadstatus, readdata,',');
+				x = stof(readdata);
+				playerstatus1.x = x;
+				getline(loadstatus, readdata, ',');
+				x = stof(readdata);
+				playerstatus1.y = x;
+				getline(loadstatus, readdata, ',');
+				x = stof(readdata);
+				playerstatus1.z = x;
+				getline(loadstatus, readdata, ',');
+				x = stof(readdata);
+				playerstatus1.direction = x;
+				getline(loadstatus, readdata, '.');
+				x = stof(readdata);
+				playerstatus1.rotation = x;
+			}
+		}
+		else
+		{
+			exit(EXIT_FAILURE);
+		}
+		loadstatus.close();
+		return loaddata;
+	}
+	playerstatus loadstatusmenu(int mapchoiceint, playerstatus playerstatus1)
+	{
+		std::string mapchoice;
+		switch (mapchoiceint)
+		
+		{
+		case 1:
+		{
+			mapchoice = "statussave1.txt";
+			return loadstatus(mapchoice, playerstatus1);
+		}
+		case 2:
+		{
+			mapchoice = "statussave2.txt";
+			return loadstatus(mapchoice, playerstatus1);
+		}
+		case 3:
+		{
+			mapchoice = "statussave1.txt";
+			return loadstatus(mapchoice, playerstatus1);
+		}
+		default:
+			break;
+		}
+		
+	}
+	pole loadmenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2],int mapchoiceint)
 	{
 		int loadsavedorloadmap;
 		std::string mapchoice;
-		int mapchoiceint = 0;
+		
 		if (loadsavedorloadmap == 1)
 		{
 			switch (mapchoiceint)
@@ -203,17 +306,17 @@ namespace core {
 			case 1:
 			{
 				mapchoice = "savefile1.txt";
-				mapload(polemap, mapchoice);
+				return mapload(polemap, mapchoice);
 			}
 			case 2:
 			{
 				mapchoice = "savefile1.txt";
-				mapload(polemap, mapchoice);
+				return mapload(polemap, mapchoice);
 			}
 			case 3:
 			{
 				mapchoice = "savefile1.txt";
-				mapload(polemap, mapchoice);
+				return mapload(polemap, mapchoice);
 			}
 			default:
 				break;
