@@ -10,9 +10,13 @@ using namespace std;
 namespace core {
 	core::Game::Tank tank;
 	std::list<Bullet> List_Of_Bullets{};
+	std::list<core::Game::Enemy_Tank> List_Of_Enemy_Tanks{};
+	std::list<core::Game::Barrel>List_Of_Barrels{};
 	Game::Game(Renderer* _renderer, Platform* _platform) :
 		renderer(_renderer), platform(_platform), scene(Scene::Main_Menu), menu_choice() {
 		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16);
+		
+		//bullet_alias = renderer->sprite("./assets/bullet.jpg");
 	}
 	void Game::menu() {
 		menu_choice = 0;
@@ -251,7 +255,7 @@ namespace core {
 
 			break;
 
-
+//Game_1player
 		case Scene::Game_1player:
 			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
 				for (float j = 0; j < Background_Tile_Count_Y; j += 1) {
@@ -260,10 +264,21 @@ namespace core {
 			}
 			tank.animate(delta_time);
 			renderer->draw_sprite(tank.position, tank.size, (float)tank.rotation, tiles_sprite_atlas, tank.sprite_index);
+
 			for (auto& bullet : List_Of_Bullets) {
 				bullet.animate(delta_time);
 				bullet.render(renderer, tiles_sprite_atlas);
+				if (!on_screen(bullet.position, bullet.size)) {
+					List_Of_Bullets.remove(bullet);
+					goto do_not_crash_doing_bullets_loop;
+				}
 			}
+		do_not_crash_doing_bullets_loop:;
+
+			for (auto& barrel : List_Of_Barrels) {
+				renderer->draw_sprite(barrel.position, barrel.size, 0, tiles_sprite_atlas, barrel.sprite_index);
+			}
+		do_not_crash_doing_barrels_loop:;
 
 			break;
 		case Scene::Select_Level_2player:
@@ -277,7 +292,6 @@ namespace core {
 					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, 1);
 				}
 			}
-
 
 			//drawing tank
 			tank.go(delta_time);
@@ -322,7 +336,6 @@ namespace core {
 		case Scene::Select_Level_1player:
 			if (platform->was_key_pressed(core::Keycode::Return)) {
 				//Game_1player();
-				
 				scene = Scene::Game_1player;
 			}
 			break;
@@ -345,6 +358,17 @@ namespace core {
 				List_Of_Bullets.push_front({ 2, tank.direction, tank.position });
 				}
 
+		//debuging 
+			
+			if (platform->was_key_pressed(core::Keycode::A)) {
+				printf("TANK X Y Z: %f %f %f\n", tank.position.x, tank.position.y, tank.position.z);
+			}
+			
+			if (platform->was_key_pressed(core::Keycode::B)) {
+				
+				List_Of_Barrels.push_front({ 18,{5.5f,5.5f,0.2f},{1.0f,1.0f} });
+				printf("Added Barrel\n");
+			}
 
 			break;
 		case Scene::Select_Level_2player:
@@ -379,6 +403,19 @@ namespace core {
 		
 	}
 
+	bool Game::fully_on_screen(Vec3 position, Vec2 size)
+	{
+		if (position.x-size.x/2 > 0 && position.y-size.y/2 > 0 && position.x + size.x / 2 <Background_Tile_Count_X && position.y + size.y / 2 < Background_Tile_Count_Y) return true;
+
+		return false;
+	}
+	bool Game::on_screen(Vec3 position, Vec2 size)
+	{
+		if (position.x + size.x / 2 > 0 && position.y + size.y / 2 > 0 && position.x - size.x / 2 < Background_Tile_Count_X && position.y - size.y / 2 < Background_Tile_Count_Y) return true;
+
+		return false;
+	}
+
 
 	void Game::Tank::move(float direction)
 	{
@@ -396,8 +433,15 @@ namespace core {
 		if (distance_to_travel >= 0) {
 			const float scale = PI;
 			this->distance_to_travel -= delta_time;
-			this->position = { this->position.x + scale * delta_time * (float)sin(direction), this->position.y + scale * delta_time * (float)cos(direction),this->position.z };
 			this->rotation = (float)direction;
+
+			//be inside of window
+			Vec3 next_position;
+			next_position= { this->position.x + scale * delta_time * (float)sin(direction), this->position.y + scale * delta_time * (float)cos(direction),this->position.z };
+			if (next_position.x - size.x / 2 > 0 && next_position.y - size.y / 2 > 0 && next_position.x + size.x / 2 < Background_Tile_Count_X && next_position.y + size.y / 2 < Background_Tile_Count_Y) {
+				this->position = next_position;
+			}
+
 		}
 
 	}
@@ -405,11 +449,14 @@ namespace core {
 	{
 		float scale = 1;
 		if(distance_to_travel>0){
-		this->position = { this->position.x + scale *  (float)sin(direction), this->position.y + scale *  (float)cos(direction),this->position.z };
+			Vec3 next_position;
+			next_position = { this->position.x + scale * (float)sin(direction), this->position.y + scale  * (float)cos(direction),this->position.z };
+			if (next_position.x> 0 && next_position.y > 0 && next_position.x < Background_Tile_Count_X && next_position.y < Background_Tile_Count_Y) {
+				this->position = next_position;
+			}
+		//this->position = { this->position.x + scale *  (float)sin(direction), this->position.y + scale *  (float)cos(direction),this->position.z };
 		this->rotation = (float)direction;
 		this->distance_to_travel=0;
 		}
 	}
-
-
 }
