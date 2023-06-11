@@ -23,11 +23,12 @@ namespace core {
 		
 		Bullet(std::int32_t sprite_index, float direction, Vec3 position);
 		void render(core::Renderer* renderer, core::Sprite_Index tiles_sprite_atlas);
+
+		bool operator == (const Bullet& b) const { 
+			return position.x == b.position.x && position.y == b.position.y && position.z == b.position.z && 
+				size.x==b.size.x && size.y ==b.size.y
+				&& direction == b.direction; }
 	};
 	
-	
-	//void animate_bulets(float delta_time);
-
-	//void render_bulets(core::Renderer* renderer, core::Sprite_Index tiles_sprite_atlas);
 }
 #endif
