@@ -14,7 +14,7 @@ namespace core {
 	Game::Game(Renderer* _renderer, Platform* _platform) :
 		renderer(_renderer), platform(_platform), scene(Scene::Main_Menu), menu_choice() {
 		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16);
-		player1_alias = renderer->sprite("./assets/player.bmp");
+		player1_alias = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16); //renderer->sprite("./assets/player.bmp");
 		bullet_alias = renderer->sprite("./assets/bullet.bmp");
 		eagle_alias = renderer->sprite("./assets/bullet.bmp");
 	}
@@ -376,7 +376,11 @@ namespace core {
 				List_Of_Barrels.push_front({ 18,{5.5f,5.5f,0.2f},{1.0f,1.0f} });
 				printf("Added Barrel\n");
 			}
-
+			if (platform->was_key_pressed(core::Keycode::C)) {
+				if (collision(tank.position, tank.size, { 5.5f,5.5f,0.2f }, 0.5f)) {
+					printf("Colision detected witg circle\n");
+				}
+			}
 			break;
 		case Scene::Select_Level_2player:
 			if (platform->was_key_pressed(core::Keycode::Return))
@@ -421,6 +425,18 @@ namespace core {
 		if (position.x + size.x / 2 > 0 && position.y + size.y / 2 > 0 && position.x - size.x / 2 < Background_Tile_Count_X && position.y - size.y / 2 < Background_Tile_Count_Y) return true;
 
 		return false;
+	}
+	bool Game::collision(Vec3 position1, Vec2 size1, Vec3 position2, Vec2 size2) {
+		return(position1.x + size1.x / 2 > position2.x - size2.x/2 && position1.y + size1.y / 2 > position2.y - size2.y / 2 &&
+			position1.x - size1.x / 2 < position2.x + size2.x / 2 && position1.y - size1.y / 2 < position2.y + size2.y / 2
+			);
+	}
+	bool Game::collision(Vec3 position1, Vec2 size1, Vec3 circle_position, float radius) {
+		float distance_between = sqrt((circle_position.x - position1.x) * (circle_position.x - position1.x) + (circle_position.y - position1.y) * (circle_position.y - position1.y));
+		//float x = size1.x / 2 * (circle_position.x - position1.x)/distance_between;
+		//float y = size1.y / 2 * (circle_position.y - position1.y) / distance_between;
+		//printf("distacnce %f = radius %f  x:%f y:%f\n", distance_between, radius, x, y);
+		return distance_between < radius+ abs(size1.x / 2 * (circle_position.x - position1.x) / distance_between) + abs(size1.y / 2 * (circle_position.y - position1.y) / distance_between);
 	}
 
 

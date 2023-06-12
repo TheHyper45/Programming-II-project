@@ -24,7 +24,8 @@ namespace core {
 
 		bool fully_on_screen(Vec3 position, Vec2 size);
 		bool on_screen(Vec3 position, Vec2 size);
-
+		bool collision(Vec3 position1, Vec2 size1, Vec3 position2, Vec2 size2);
+		bool collision(Vec3 position1, Vec2 size1, Vec3 circle_position, float radius);
 		Game(core::Renderer* renderer,core::Platform* platform);
 		
 		class Tank {
