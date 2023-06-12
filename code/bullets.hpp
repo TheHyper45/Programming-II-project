@@ -14,7 +14,7 @@ namespace core {
 
 	class Bullet {
 	public:
-		std::int32_t sprite_index=2;
+		std::int32_t sprite_index=1;
 		float direction;
 		Vec3 position;
 		Vec2 size = { 1.0f,1.0f };

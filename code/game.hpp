@@ -74,6 +74,8 @@ namespace core {
 	private:
 		Sprite_Index tiles_sprite_atlas;
 		Sprite_Index bullet_alias;
+		Sprite_Index player1_alias;
+		Sprite_Index eagle_alias;
 		Renderer* renderer;
 		Platform* platform;
 		Scene scene;
