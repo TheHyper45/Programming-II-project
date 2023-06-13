@@ -24,7 +24,8 @@ namespace core {
 
 		bool fully_on_screen(Vec3 position, Vec2 size);
 		bool on_screen(Vec3 position, Vec2 size);
-
+		bool collision(Vec3 position1, Vec2 size1, Vec3 position2, Vec2 size2);
+		bool collision(Vec3 position1, Vec2 size1, Vec3 circle_position, float radius);
 		Game(core::Renderer* renderer,core::Platform* platform);
 		
 		class Tank {
@@ -74,6 +75,8 @@ namespace core {
 	private:
 		Sprite_Index tiles_sprite_atlas;
 		Sprite_Index bullet_alias;
+		Sprite_Index player1_alias;
+		Sprite_Index eagle_alias;
 		Renderer* renderer;
 		Platform* platform;
 		Scene scene;
