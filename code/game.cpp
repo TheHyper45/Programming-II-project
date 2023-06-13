@@ -15,9 +15,10 @@ namespace core {
 	Game::Game(Renderer* _renderer, Platform* _platform) :
 		renderer(_renderer), platform(_platform), scene(Scene::Main_Menu), menu_choice() {
 		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16);
-		player1_alias = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16); //renderer->sprite("./assets/player.bmp");
+		player1_alias = renderer->sprite("./assets/player.bmp");
 		bullet_alias = renderer->sprite("./assets/bullet.bmp");
-		eagle_alias = renderer->sprite("./assets/bullet.bmp");
+		eagle_alias = renderer->sprite("./assets/eagle.bmp");
+		explosions_atlas = renderer->sprite_atlas("./assets/explosions_16x16.bmp", 16);
 	}
 	void Game::menu() {
 		menu_choice = 0;
@@ -390,12 +391,40 @@ namespace core {
 			for (auto& bullet : List_Of_Bullets) {
 				bullet.animate(delta_time);
 				bullet.render(renderer, bullet_alias);
+
+				for (auto& barrel : List_Of_Barrels) {
+					if (collision(barrel.position, barrel.hitbox_radius, bullet.position, bullet.hitbox_radius)) {
+						printf("Explosion\n");
+						List_Of_Bullets.remove(bullet);
+						List_Of_Barrels.remove(barrel);
+						break;
+					};
+				}
+				for (auto& enemy : List_Of_Enemy_Tanks) {
+					if (collision(enemy.position, enemy.hitbox, bullet.position, bullet.hitbox_radius)) {
+						printf("Explosion\n");
+						List_Of_Bullets.remove(bullet);
+						List_Of_Enemy_Tanks.remove(enemy);
+						break;
+					}						
+				}
+
 				if (!on_screen(bullet.position, bullet.size)) {
 					List_Of_Bullets.remove(bullet);
 					break;
 				}
 			}
-
+			for (auto& enemy : List_Of_Enemy_Tanks) {
+				if (collision(tank.position, tank.hitbox, enemy.position, enemy.hitbox)) {
+					tank.destroyed();
+					enemy.durability--;
+					if (enemy.durability < 1) {
+						List_Of_Enemy_Tanks.remove(enemy);
+						break;
+					}
+				}
+				renderer->draw_sprite(enemy.position, enemy.size, enemy.rotation, tiles_sprite_atlas, enemy.sprite_index);
+			}
 			for (auto& barrel : List_Of_Barrels) {
 				renderer->draw_sprite(barrel.position, barrel.size, 0, tiles_sprite_atlas, barrel.sprite_index);
 			}
@@ -475,11 +504,6 @@ namespace core {
 			}
 			
 			break;
-			/*
-				if (menu_choice ==2) {
-					scene = Scene::Load_game;
-				}
-				*/
 		case Scene::Select_Level_1player:
 			if (platform->was_key_pressed(core::Keycode::Return)) {
 				//Game_1player();
@@ -529,11 +553,11 @@ namespace core {
 
 			}
 			if (platform->was_key_pressed(core::Keycode::C)) {
-				if (collision(tank.position, tank.size, { 5.5f,5.5f,0.2f }, 0.5f)) {
-					printf("Colision detected witg circle\n");
-				}
+				List_Of_Enemy_Tanks.push_back({ 3,{2.5f,2.5f,0} });
  
 			}
+			
+
 			break;
 		case Scene::Select_Level_2player:
 			if (platform->was_key_pressed(core::Keycode::Return))
@@ -593,6 +617,9 @@ namespace core {
 		//printf("distacnce %f = radius %f  x:%f y:%f\n", distance_between, radius, x, y);
 		return distance_between < radius+ abs(size1.x / 2 * (circle_position.x - position1.x) / distance_between) + abs(size1.y / 2 * (circle_position.y - position1.y) / distance_between);
 	}
+	bool Game::collision(Vec3 circle_position1, float radius1, Vec3 circle_position2, float radius2) {
+		return radius1+radius2> sqrt((circle_position2.x - circle_position1.x) * (circle_position2.x - circle_position1.x) + (circle_position2.y - circle_position1.y) * (circle_position2.y - circle_position1.y));
+	}
 
 
 	void Game::Tank::move(float direction)
@@ -645,4 +672,9 @@ namespace core {
 		this->distance_to_travel=0;
 		}
 	}
+	void Game::Tank::destroyed() {
+		printf("The tank is destroyed make it happend\n");
+	}
+
+	
 }

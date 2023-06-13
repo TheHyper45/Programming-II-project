@@ -17,7 +17,8 @@ namespace core {
 		std::int32_t sprite_index=1;
 		float direction;
 		Vec3 position;
-		Vec2 size = { 1.0f,1.0f };
+		Vec2 size = { 0.5f,0.5f };
+		float hitbox_radius = 0.1f;
 		void move(float direction);
 		void animate(float delta_time);
 		
