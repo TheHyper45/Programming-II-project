@@ -9,6 +9,7 @@
 using namespace std;
 namespace core {
 	core::Game::Tank tank;
+	//core::Game::Tank tank2;
 	std::list<Bullet> List_Of_Bullets{};
 	std::list<core::Game::Enemy_Tank> List_Of_Enemy_Tanks{};
 	std::list<core::Game::Barrel>List_Of_Barrels{};
@@ -44,7 +45,7 @@ namespace core {
 		float rotation;
 		float direction;
 	};
-	pole mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = { 2, 1, Tile_flag::Below };
+	pole mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
 	playerstatus playerstatus1= { 0,0,0,0,0 };
 	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
 	{
@@ -57,10 +58,16 @@ namespace core {
 			{
 				for (int j = 0; j < Background_Tile_Count_X * 2; j++)
 				{
+					if (i == 0 || i == Background_Tile_Count_X * 2 - 1 || j == 0 || j == Background_Tile_Count_Y * 2 - 1)
+					{
+
+					}
 					//save << "{";
 					save << polemap[i][j].sprite_layer_index << ",";
 					save << polemap[i][j].health << ",";
 					toenumint = static_cast<int>(polemap[i][j].flag);
+					std::cout << toenumint;
+					save << toenumint;
 					//save << toenumint << "}";
 					//save << polemap[i][j].flag;
 					save << ";";
@@ -113,7 +120,7 @@ namespace core {
 			filename = "savefile1.txt";
 			filename2 = "statussave1.txt";
 			SaveMap(filename, polemap);
-			savePlayerStatus(tank, filename2);
+			//savePlayerStatus(tank, filename2);
 
 		}
 		case 2 :
@@ -121,14 +128,14 @@ namespace core {
 			filename = "savefile2.txt";
 			filename2 = "statussave2.txt";
 			SaveMap(filename, polemap);
-			savePlayerStatus(tank, filename2);
+			//savePlayerStatus(tank, filename2);
 		}
 		case 3:
 		{
 			filename = "savefile3.txt";
 			filename2 = "statussave3.txt";
 			SaveMap(filename, polemap);
-			savePlayerStatus(tank, filename2);
+			//savePlayerStatus(tank, filename2);
 		}
 		default:
 		{
@@ -183,7 +190,7 @@ namespace core {
 						{
 							passedflag = Tile_flag::Bulletpass;
 						}
-						else
+						else if(readflag =="Barrier")
 						{
 							passedflag = Tile_flag::Barrier;
 						}
@@ -275,7 +282,7 @@ namespace core {
 	}
 	pole loadmenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2],int mapchoiceint)
 	{
-		int loadsavedorloadmap;
+		int loadsavedorloadmap = 2;
 		std::string mapchoice;
 		
 		if (loadsavedorloadmap == 1)
@@ -342,7 +349,8 @@ namespace core {
 			
 			renderer->draw_text({ 2.0f,4.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices==2 ? 0 : 1) }, "1 player");
 			renderer->draw_text({ 2.0f,5.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == 1 ? 0 : 1) }, "2 player");
-			renderer->draw_text({ 2.0f,6.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == 0 ? 0 : 1) }, "Construction");
+			renderer->draw_text({ 2.0f,6.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice + 2) % number_of_choices == 0 ? 0 : 1) }, "Load Game");
+			renderer->draw_text({ 2.0f,7.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == -1 ? 0 : 1) }, "Construction");
 			break;
 
 		case Scene::Select_Level_1player:
@@ -360,9 +368,13 @@ namespace core {
 
 //Game_1player
 		case Scene::Game_1player:
+			int a, b;
 			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y; j += 1) {
-					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, 1);
+				for (float j = 0; j < Background_Tile_Count_Y; j += 1) 
+				{
+					a = static_cast<int>(i);
+					b = static_cast<int>(j);
+					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, mapArray[a][b].sprite_layer_index);
 				}
 			}
 			tank.animate(delta_time);
@@ -389,10 +401,14 @@ namespace core {
 		case Scene::Game_2player:
 			break;
 		case Scene::Construction:
+			int c, d;
 			//drawing texture number 1;
 			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y; j += 1) {
-					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, 1);
+				for (float j = 0; j < Background_Tile_Count_Y; j += 1) 
+				{
+					c = static_cast<int>(i);
+					d = static_cast<int>(j);
+					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, mapArray[c][d].sprite_layer_index);
 				}
 			}
 
@@ -401,6 +417,10 @@ namespace core {
 			renderer->draw_sprite(tank.position, tank.size, (float)tank.rotation, tiles_sprite_atlas, tank.sprite_index);
 
 			break;
+		case Scene::Load_game:
+			{
+			renderer->draw_text({ 1.0f,3.0f,1 }, { 1.0f,1.0f }, { 1.0f,1.0f,1.0f }, "Choose save file");
+			}
 		default:
 			break;
 		}
@@ -472,7 +492,17 @@ namespace core {
 				List_Of_Barrels.push_front({ 18,{5.5f,5.5f,0.2f},{1.0f,1.0f} });
 				printf("Added Barrel\n");
 			}
+			if (platform->was_key_pressed(core::Keycode::T)) 
+			{
+				SaveMenu(mapArray, tank);
+				printf("saving \n");
+			}
+			if (platform->was_key_pressed(core::Keycode::Y)) 
+			{
+				mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = loadmenu(mapArray,1);
+				printf("loading, \n ");
 
+			}
 			break;
 		case Scene::Select_Level_2player:
 			if (platform->was_key_pressed(core::Keycode::Return))

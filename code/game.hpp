@@ -5,6 +5,7 @@
 //#include <list>
 #include <fstream>
 #include <string>
+#include <iostream>
 
 namespace core {
 	enum class Scene {
@@ -14,6 +15,7 @@ namespace core {
 		Select_Level_2player,
 		Game_2player,
 		Construction,
+		Load_game,
 	};
 
 	class Game {
