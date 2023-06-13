@@ -1,10 +1,9 @@
 #include "game.hpp"
-#include <corecrt_math.h>
+#include <cmath>
 #include "math.hpp"
 #include <stdio.h>
 #include "bullets.hpp"
 #include <list>
-
 #define number_of_choices 3
 using namespace std;
 namespace core {
@@ -16,8 +15,9 @@ namespace core {
 	Game::Game(Renderer* _renderer, Platform* _platform) :
 		renderer(_renderer), platform(_platform), scene(Scene::Main_Menu), menu_choice() {
 		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16);
-		
-		//bullet_alias = renderer->sprite("./assets/bullet.jpg");
+		player1_alias = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16); //renderer->sprite("./assets/player.bmp");
+		bullet_alias = renderer->sprite("./assets/bullet.bmp");
+		eagle_alias = renderer->sprite("./assets/bullet.bmp");
 	}
 	void Game::menu() {
 		menu_choice = 0;
@@ -153,7 +153,7 @@ namespace core {
 		std::string readdata, readhealth, readflag, readindex;
 		int passedindex, passedhealth;
 
-		Tile_flag passedflag;
+		Tile_flag passedflag = Tile_flag::Solid;
 		if (load.good())
 		{
 			if (load.eof())
@@ -349,8 +349,9 @@ namespace core {
 			
 			renderer->draw_text({ 2.0f,4.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices==2 ? 0 : 1) }, "1 player");
 			renderer->draw_text({ 2.0f,5.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == 1 ? 0 : 1) }, "2 player");
-			renderer->draw_text({ 2.0f,6.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice + 2) % number_of_choices == 0 ? 0 : 1) }, "Load Game");
-			renderer->draw_text({ 2.0f,7.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == -1 ? 0 : 1) }, "Construction");
+			renderer->draw_text({ 2.0f,6.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice + 2) % number_of_choices == 0 ? 0 : 1) }, "Construction");
+			//	renderer->draw_text({ 2.0f,6.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice + 2) % number_of_choices == 0 ? 0 : 1) }, "Load Game");
+		//	renderer->draw_text({ 2.0f,7.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == -1 ? 0 : 1) }, "Construction");
 			break;
 
 		case Scene::Select_Level_1player:
@@ -378,49 +379,60 @@ namespace core {
 				}
 			}
 			tank.animate(delta_time);
-			renderer->draw_sprite(tank.position, tank.size, (float)tank.rotation, tiles_sprite_atlas, tank.sprite_index);
+			renderer->draw_sprite(tank.position, tank.size, (float)tank.rotation, player1_alias, 0);
 
 			for (auto& bullet : List_Of_Bullets) {
 				bullet.animate(delta_time);
-				bullet.render(renderer, tiles_sprite_atlas);
+				bullet.render(renderer, bullet_alias);
 				if (!on_screen(bullet.position, bullet.size)) {
 					List_Of_Bullets.remove(bullet);
-					goto do_not_crash_doing_bullets_loop;
+					break;
 				}
 			}
-		do_not_crash_doing_bullets_loop:;
 
 			for (auto& barrel : List_Of_Barrels) {
 				renderer->draw_sprite(barrel.position, barrel.size, 0, tiles_sprite_atlas, barrel.sprite_index);
 			}
-		do_not_crash_doing_barrels_loop:;
-
 			break;
 		case Scene::Select_Level_2player:
+			while (true)
+			{
+				for (float i = 0; i < Background_Tile_Count_X; i += 1) {
+					for (float j = 0; j < Background_Tile_Count_Y; j += 1) {
+						renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, 1);
+					}
+				}
+
+			}
+
 			break;
 		case Scene::Game_2player:
 			break;
 		case Scene::Construction:
+		{
 			int c, d;
 			//drawing texture number 1;
 			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y; j += 1) 
+				for (float j = 0; j < Background_Tile_Count_Y; j += 1)
 				{
 					c = static_cast<int>(i);
 					d = static_cast<int>(j);
 					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, mapArray[c][d].sprite_layer_index);
 				}
 			}
-
+		}
 			//drawing tank
 			tank.go(delta_time);
 			renderer->draw_sprite(tank.position, tank.size, (float)tank.rotation, tiles_sprite_atlas, tank.sprite_index);
 
 			break;
+			/*
 		case Scene::Load_game:
 			{
 			renderer->draw_text({ 1.0f,3.0f,1 }, { 1.0f,1.0f }, { 1.0f,1.0f,1.0f }, "Choose save file");
+			break;
 			}
+			*/
 		default:
 			break;
 		}
@@ -433,33 +445,35 @@ namespace core {
 				menu_choice--;
 				//printf("menu choice: %d\n", menu_choice);
 				if (menu_choice < 1) {
-					menu_choice+=4;
+					menu_choice += 3;
 				}
 			}
 			if (platform->was_key_pressed(core::Keycode::Up)) {
 				menu_choice++;
-				if (menu_choice >5) {
-					menu_choice -=4;
+				if (menu_choice > 4) {
+					menu_choice -= 3;
 				}
 				//printf("menu choice: %d\n", menu_choice);
 			}
 			if (platform->was_key_pressed(core::Keycode::Return)) {
 				//printf("Execute choice: %d\n", menu_choice);
-				if (menu_choice==1) {
+				if (menu_choice == 3 || menu_choice == 0) {
 					scene = Scene::Select_Level_1player;
 				}
 				if (menu_choice == 2) {
 					scene = Scene::Select_Level_2player;
 				}
-				if (menu_choice ==3) {
-					scene = Scene::Load_game;
-				}
-				if (menu_choice == 4)
-				{
+				if (menu_choice == 1 || menu_choice == 4) {
 					scene = Scene::Construction;
 				}
 			}
+			
 			break;
+			/*
+				if (menu_choice ==2) {
+					scene = Scene::Load_game;
+				}
+				*/
 		case Scene::Select_Level_1player:
 			if (platform->was_key_pressed(core::Keycode::Return)) {
 				//Game_1player();
@@ -482,7 +496,7 @@ namespace core {
 			}
 			//shooting
 			if (platform->was_key_pressed(core::Keycode::A) || platform->was_key_pressed(core::Keycode::Space)) {
-				List_Of_Bullets.push_front({ 2, tank.direction, tank.position });
+				List_Of_Bullets.push_front({ 0, tank.direction, tank.position });
 				}
 
 		//debuging 
@@ -496,16 +510,23 @@ namespace core {
 				List_Of_Barrels.push_front({ 18,{5.5f,5.5f,0.2f},{1.0f,1.0f} });
 				printf("Added Barrel\n");
 			}
+
 			if (platform->was_key_pressed(core::Keycode::T)) 
 			{
 				SaveMenu(mapArray, tank);
 				printf("saving \n");
 			}
-			if (platform->was_key_pressed(core::Keycode::Y)) 
+			if (platform->was_key_pressed(core::Keycode::Y))
 			{
-				mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = loadmenu(mapArray,1);
+				mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = loadmenu(mapArray, 1);
 				printf("loading, \n ");
 
+			}
+			if (platform->was_key_pressed(core::Keycode::C)) {
+				if (collision(tank.position, tank.size, { 5.5f,5.5f,0.2f }, 0.5f)) {
+					printf("Colision detected witg circle\n");
+				}
+ 
 			}
 			break;
 		case Scene::Select_Level_2player:
@@ -534,8 +555,10 @@ namespace core {
 			}
 			break;
 		default:
+		{
 			printf("BAD SCENE\n");
 			break;
+		}
 		}
 		
 	}
@@ -551,6 +574,18 @@ namespace core {
 		if (position.x + size.x / 2 > 0 && position.y + size.y / 2 > 0 && position.x - size.x / 2 < Background_Tile_Count_X && position.y - size.y / 2 < Background_Tile_Count_Y) return true;
 
 		return false;
+	}
+	bool Game::collision(Vec3 position1, Vec2 size1, Vec3 position2, Vec2 size2) {
+		return(position1.x + size1.x / 2 > position2.x - size2.x/2 && position1.y + size1.y / 2 > position2.y - size2.y / 2 &&
+			position1.x - size1.x / 2 < position2.x + size2.x / 2 && position1.y - size1.y / 2 < position2.y + size2.y / 2
+			);
+	}
+	bool Game::collision(Vec3 position1, Vec2 size1, Vec3 circle_position, float radius) {
+		float distance_between = sqrt((circle_position.x - position1.x) * (circle_position.x - position1.x) + (circle_position.y - position1.y) * (circle_position.y - position1.y));
+		//float x = size1.x / 2 * (circle_position.x - position1.x)/distance_between;
+		//float y = size1.y / 2 * (circle_position.y - position1.y) / distance_between;
+		//printf("distacnce %f = radius %f  x:%f y:%f\n", distance_between, radius, x, y);
+		return distance_between < radius+ abs(size1.x / 2 * (circle_position.x - position1.x) / distance_between) + abs(size1.y / 2 * (circle_position.y - position1.y) / distance_between);
 	}
 
 
@@ -572,10 +607,17 @@ namespace core {
 			this->distance_to_travel -= delta_time;
 			this->rotation = (float)direction;
 
+			if (direction == 0) { this->rotation = PI; }
+			else {
+				if (direction == PI) this->rotation = 0;
+			}
+
 			//be inside of window
 			Vec3 next_position;
-			next_position= { this->position.x + scale * delta_time * (float)sin(direction), this->position.y + scale * delta_time * (float)cos(direction),this->position.z };
-			if (next_position.x - size.x / 2 > 0 && next_position.y - size.y / 2 > 0 && next_position.x + size.x / 2 < Background_Tile_Count_X && next_position.y + size.y / 2 < Background_Tile_Count_Y) {
+			next_position= { this->position.x + scale * delta_time * std::sin(direction), this->position.y + scale * delta_time * std::cos(direction),this->position.z };
+			if (next_position.x - size.x / 2 > 0 && next_position.y - size.y / 2 > 0 && next_position.x + size.x / 2 < Background_Tile_Count_X && next_position.y + size.y / 2 < Background_Tile_Count_Y
+				
+				) {
 				this->position = next_position;
 			}
 
@@ -587,11 +629,12 @@ namespace core {
 		float scale = 1;
 		if(distance_to_travel>0){
 			Vec3 next_position;
-			next_position = { this->position.x + scale * (float)sin(direction), this->position.y + scale  * (float)cos(direction),this->position.z };
-			if (next_position.x> 0 && next_position.y > 0 && next_position.x < Background_Tile_Count_X && next_position.y < Background_Tile_Count_Y) {
+			next_position = { this->position.x + scale * std::sin(direction), this->position.y + scale  * std::cos(direction),this->position.z };
+			if (next_position.x> 0 && next_position.y > 0 && next_position.x < Background_Tile_Count_X && next_position.y < Background_Tile_Count_Y				
+				) {
 				this->position = next_position;
 			}
-		//this->position = { this->position.x + scale *  (float)sin(direction), this->position.y + scale *  (float)cos(direction),this->position.z };
+		
 		this->rotation = (float)direction;
 		this->distance_to_travel=0;
 		}
