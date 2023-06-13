@@ -8,6 +8,7 @@
 using namespace std;
 namespace core {
 	core::Game::Tank tank;
+	//core::Game::Tank tank2;
 	std::list<Bullet> List_Of_Bullets{};
 	std::list<core::Game::Enemy_Tank> List_Of_Enemy_Tanks{};
 	std::list<core::Game::Barrel>List_Of_Barrels{};
@@ -36,29 +37,44 @@ namespace core {
 		std::uint32_t health;
 		Tile_flag flag;
 	};
-	pole mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = { 2, 1, Tile_flag::Below };
-	pole* pointertomap;
-	//pole polemap[Background_Tile_Count_X*2][Background_Tile_Count_Y*2]
-	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	struct playerstatus
 	{
-		int toenumint;
+		float x;
+		float y;
+		float z;
+		float rotation;
+		float direction;
+	};
+	pole mapArray[Background_Tile_Count_X*2 ][Background_Tile_Count_Y*2 ];
+	playerstatus playerstatus1= { 0,0,0,0,0 };
+	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X*2 ][Background_Tile_Count_Y*2 ])
+	{
+		int toenumint,b,c;
+		b = Background_Tile_Count_X * 2;
+		//b = b ;
+		c = Background_Tile_Count_Y * 2;
+		//c = c ;
 		std::ofstream save;
 		save.open(filename, std::ios::out);
 		if (save.good())
 		{
-			for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
+			for (int i = 0; i < Background_Tile_Count_X*2 ; i++)
 			{
-				for (int j = 0; j < Background_Tile_Count_X * 2; j++)
+				for (int j = 0; j < Background_Tile_Count_Y*2 ; j++)
 				{
+					polemap[i][j].sprite_layer_index = j;
 					//save << "{";
 					save << polemap[i][j].sprite_layer_index << ",";
 					save << polemap[i][j].health << ",";
 					toenumint = static_cast<int>(polemap[i][j].flag);
+					std::cout << toenumint;
+					save << toenumint;
 					//save << toenumint << "}";
 					//save << polemap[i][j].flag;
 					save << ";";
 
 				}
+				save << "\n";
 			}
 
 		}
@@ -68,29 +84,60 @@ namespace core {
 		}
 		save.close();
 	}
-	void SaveMenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	void savePlayerStatus(core::Game::Tank tank, string filename2)
+	{
+		float x, y, z, direction, rotation;
+		x = tank.position.x;
+		y = tank.position.y;
+		z = tank.position.z;
+		rotation = tank.rotation;
+		direction = tank.direction;
+		std::ofstream savestatus;
+		savestatus.open(filename2, std::ios::out);
+		if (savestatus.good())
+		{
+			savestatus << x << ",";
+			savestatus << y << ",";
+			savestatus << z << ",";
+			savestatus << direction << ",";
+			savestatus << rotation << ".";
+		}
+		else
+		{
+			exit(EXIT_FAILURE);
+		}
+		savestatus.close();
+
+	}
+	void SaveMenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2], core::Game::Tank tank)
 	{
 		int savechoice = 1;
 		
-		std::string filename;
+		std::string filename,filename2;
 		
 		switch (savechoice)
 		{
 		case 1:
 		{
 			filename = "savefile1.txt";
+			filename2 = "statussave1.txt";
 			SaveMap(filename, polemap);
+			//savePlayerStatus(tank, filename2);
 
 		}
 		case 2 :
 		{
 			filename = "savefile2.txt";
+			filename2 = "statussave2.txt";
 			SaveMap(filename, polemap);
+			//savePlayerStatus(tank, filename2);
 		}
 		case 3:
 		{
 			filename = "savefile3.txt";
+			filename2 = "statussave3.txt";
 			SaveMap(filename, polemap);
+			//savePlayerStatus(tank, filename2);
 		}
 		default:
 		{
@@ -98,16 +145,17 @@ namespace core {
 		}
 		}
 	}
-
+	
+	
 	pole mapload(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2], std::string mapchoice)
 	{
 
 		std::ifstream load;
 		load.open(mapchoice);
-		std::string readdata, readhealth, readflag, readindex;
+		std::string readdata, readhealth, readflag, readindex,skip;
 		int passedindex, passedhealth;
 
-		Tile_flag passedflag;
+		Tile_flag passedflag = Tile_flag::Solid;
 		if (load.good())
 		{
 			if (load.eof())
@@ -116,10 +164,11 @@ namespace core {
 			}
 			else
 			{
-				for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
+				for (int i = 0; i < Background_Tile_Count_X * 2; i++)
 				{
-					for (int j = 0; j < Background_Tile_Count_X * 2; j++)
+					for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
 					{
+						//std::getline(data, skip, '=')
 						getline(load, readdata, ',');
 						readindex = readdata;
 						getline(load, readdata, ',');
@@ -144,10 +193,11 @@ namespace core {
 						{
 							passedflag = Tile_flag::Bulletpass;
 						}
-						else
+						else if(readflag =="Barrier")
 						{
 							passedflag = Tile_flag::Barrier;
 						}
+						
 						polemap[i][j].sprite_layer_index = passedindex;
 						polemap[i][j].health = passedhealth;
 						polemap[i][j].flag = passedflag;
@@ -159,6 +209,8 @@ namespace core {
 		Barrier,
 						*/
 					}
+					getline(load, skip, '\n');
+					//load.remove('\n')
 				}
 			}
 
@@ -169,12 +221,76 @@ namespace core {
 		}
 		return polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
 	}
-
-	pole loadmenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	playerstatus loadstatus(std::string mapchoice ,playerstatus loaddata)
 	{
-		int loadsavedorloadmap;
+		float x;
+		std::string readdata;
+		
+		std::ifstream loadstatus;
+		loadstatus.open(mapchoice);
+		if (loadstatus.good())
+		{
+			if (loadstatus.eof())
+			{
+				exit;
+			}
+			else
+			{
+				getline(loadstatus, readdata,',');
+				x = stof(readdata);
+				playerstatus1.x = x;
+				getline(loadstatus, readdata, ',');
+				x = stof(readdata);
+				playerstatus1.y = x;
+				getline(loadstatus, readdata, ',');
+				x = stof(readdata);
+				playerstatus1.z = x;
+				getline(loadstatus, readdata, ',');
+				x = stof(readdata);
+				playerstatus1.direction = x;
+				getline(loadstatus, readdata, '.');
+				x = stof(readdata);
+				playerstatus1.rotation = x;
+			}
+		}
+		else
+		{
+			exit(EXIT_FAILURE);
+		}
+		loadstatus.close();
+		return loaddata;
+	}
+	playerstatus loadstatusmenu(int mapchoiceint, playerstatus playerstatus1)
+	{
 		std::string mapchoice;
-		int mapchoiceint = 0;
+		switch (mapchoiceint)
+		
+		{
+		case 1:
+		{
+			mapchoice = "statussave1.txt";
+			return loadstatus(mapchoice, playerstatus1);
+		}
+		case 2:
+		{
+			mapchoice = "statussave2.txt";
+			return loadstatus(mapchoice, playerstatus1);
+		}
+		case 3:
+		{
+			mapchoice = "statussave1.txt";
+			return loadstatus(mapchoice, playerstatus1);
+		}
+		default:
+			break;
+		}
+		
+	}
+	pole loadmenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2],int mapchoiceint)
+	{
+		int loadsavedorloadmap = 2;
+		std::string mapchoice;
+		
 		if (loadsavedorloadmap == 1)
 		{
 			switch (mapchoiceint)
@@ -207,17 +323,17 @@ namespace core {
 			case 1:
 			{
 				mapchoice = "savefile1.txt";
-				mapload(polemap, mapchoice);
+				return mapload(polemap, mapchoice);
 			}
 			case 2:
 			{
 				mapchoice = "savefile1.txt";
-				mapload(polemap, mapchoice);
+				return mapload(polemap, mapchoice);
 			}
 			case 3:
 			{
 				mapchoice = "savefile1.txt";
-				mapload(polemap, mapchoice);
+				return mapload(polemap, mapchoice);
 			}
 			default:
 				break;
@@ -239,7 +355,9 @@ namespace core {
 			
 			renderer->draw_text({ 2.0f,4.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices==2 ? 0 : 1) }, "1 player");
 			renderer->draw_text({ 2.0f,5.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == 1 ? 0 : 1) }, "2 player");
-			renderer->draw_text({ 2.0f,6.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == 0 ? 0 : 1) }, "Construction");
+			renderer->draw_text({ 2.0f,6.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice + 2) % number_of_choices == 0 ? 0 : 1) }, "Construction");
+			//	renderer->draw_text({ 2.0f,6.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice + 2) % number_of_choices == 0 ? 0 : 1) }, "Load Game");
+		//	renderer->draw_text({ 2.0f,7.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == -1 ? 0 : 1) }, "Construction");
 			break;
 
 		case Scene::Select_Level_1player:
@@ -257,9 +375,13 @@ namespace core {
 
 //Game_1player
 		case Scene::Game_1player:
-			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y; j += 1) {
-					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, 1);
+			int a, b;
+			for (float i = 0; i < Background_Tile_Count_X*2; i += 1) {
+				for (float j = 0; j < Background_Tile_Count_Y*2; j += 1) 
+				{
+					a = static_cast<int>(i);
+					b = static_cast<int>(j);
+					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, mapArray[a][b].sprite_layer_index);
 				}
 			}
 			tank.animate(delta_time);
@@ -293,18 +415,30 @@ namespace core {
 		case Scene::Game_2player:
 			break;
 		case Scene::Construction:
+		{
+			int c, d;
 			//drawing texture number 1;
-			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y; j += 1) {
-					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, 1);
+			for (float i = 0; i < Background_Tile_Count_X*2; i += 1) {
+				for (float j = 0; j < Background_Tile_Count_Y*2; j += 1)
+				{
+					c = static_cast<int>(i);
+					d = static_cast<int>(j);
+					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, mapArray[c][d].sprite_layer_index);
 				}
 			}
-
+		}
 			//drawing tank
 			tank.go(delta_time);
 			renderer->draw_sprite(tank.position, tank.size, (float)tank.rotation, tiles_sprite_atlas, tank.sprite_index);
 
 			break;
+			/*
+		case Scene::Load_game:
+			{
+			renderer->draw_text({ 1.0f,3.0f,1 }, { 1.0f,1.0f }, { 1.0f,1.0f,1.0f }, "Choose save file");
+			break;
+			}
+			*/
 		default:
 			break;
 		}
@@ -317,29 +451,35 @@ namespace core {
 				menu_choice--;
 				//printf("menu choice: %d\n", menu_choice);
 				if (menu_choice < 1) {
-					menu_choice+=3;
+					menu_choice += 3;
 				}
 			}
 			if (platform->was_key_pressed(core::Keycode::Up)) {
 				menu_choice++;
-				if (menu_choice >4) {
-					menu_choice -=3;
+				if (menu_choice > 4) {
+					menu_choice -= 3;
 				}
 				//printf("menu choice: %d\n", menu_choice);
 			}
 			if (platform->was_key_pressed(core::Keycode::Return)) {
 				//printf("Execute choice: %d\n", menu_choice);
-				if (menu_choice==3||menu_choice==0) {
+				if (menu_choice == 3 || menu_choice == 0) {
 					scene = Scene::Select_Level_1player;
 				}
 				if (menu_choice == 2) {
 					scene = Scene::Select_Level_2player;
 				}
-				if (menu_choice == 1||menu_choice==4) {
+				if (menu_choice == 1 || menu_choice == 4) {
 					scene = Scene::Construction;
 				}
 			}
+			
 			break;
+			/*
+				if (menu_choice ==2) {
+					scene = Scene::Load_game;
+				}
+				*/
 		case Scene::Select_Level_1player:
 			if (platform->was_key_pressed(core::Keycode::Return)) {
 				//Game_1player();
@@ -376,10 +516,23 @@ namespace core {
 				List_Of_Barrels.push_front({ 18,{5.5f,5.5f,0.2f},{1.0f,1.0f} });
 				printf("Added Barrel\n");
 			}
+
+			if (platform->was_key_pressed(core::Keycode::T)) 
+			{
+				SaveMenu(mapArray, tank);
+				printf("saving \n");
+			}
+			if (platform->was_key_pressed(core::Keycode::Y))
+			{
+				mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = loadmenu(mapArray, 1);
+				printf("loading, \n ");
+
+			}
 			if (platform->was_key_pressed(core::Keycode::C)) {
 				if (collision(tank.position, tank.size, { 5.5f,5.5f,0.2f }, 0.5f)) {
 					printf("Colision detected witg circle\n");
 				}
+ 
 			}
 			break;
 		case Scene::Select_Level_2player:
@@ -408,8 +561,10 @@ namespace core {
 			}
 			break;
 		default:
+		{
 			printf("BAD SCENE\n");
 			break;
+		}
 		}
 		
 	}
