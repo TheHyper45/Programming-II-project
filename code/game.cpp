@@ -49,18 +49,26 @@ namespace core {
 	playerstatus playerstatus1= { 0,0,0,0,0 };
 	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
 	{
-		int toenumint;
+		int toenumint,b,c;
+		b = Background_Tile_Count_X * 2;
+		b = b ;
+		c = Background_Tile_Count_Y * 2;
+		c = c ;
 		std::ofstream save;
 		save.open(filename, std::ios::out);
 		if (save.good())
 		{
-			for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
+			for (int i = 0; i < Background_Tile_Count_X * 2; i++)
 			{
-				for (int j = 0; j < Background_Tile_Count_X * 2; j++)
+				for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
 				{
-					if (i == 0 || i == Background_Tile_Count_X * 2 - 1 || j == 0 || j == Background_Tile_Count_Y * 2 - 1)
+					if (j > 0 || i > 0 || j < b || i < c)
 					{
-
+						polemap[i][j].sprite_layer_index = 1;
+					}
+					else
+					{
+						polemap[i][j].sprite_layer_index = 0;
 					}
 					//save << "{";
 					save << polemap[i][j].sprite_layer_index << ",";
@@ -73,6 +81,7 @@ namespace core {
 					save << ";";
 
 				}
+				save << "\n";
 			}
 
 		}
@@ -150,7 +159,7 @@ namespace core {
 
 		std::ifstream load;
 		load.open(mapchoice);
-		std::string readdata, readhealth, readflag, readindex;
+		std::string readdata, readhealth, readflag, readindex,skip;
 		int passedindex, passedhealth;
 
 		Tile_flag passedflag = Tile_flag::Solid;
@@ -162,10 +171,11 @@ namespace core {
 			}
 			else
 			{
-				for (int i = 0; i < Background_Tile_Count_Y * 2; i++)
+				for (int i = 0; i < Background_Tile_Count_X * 2; i++)
 				{
-					for (int j = 0; j < Background_Tile_Count_X * 2; j++)
+					for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
 					{
+						//std::getline(data, skip, '=')
 						getline(load, readdata, ',');
 						readindex = readdata;
 						getline(load, readdata, ',');
@@ -194,6 +204,7 @@ namespace core {
 						{
 							passedflag = Tile_flag::Barrier;
 						}
+						
 						polemap[i][j].sprite_layer_index = passedindex;
 						polemap[i][j].health = passedhealth;
 						polemap[i][j].flag = passedflag;
@@ -205,6 +216,8 @@ namespace core {
 		Barrier,
 						*/
 					}
+					getline(load, skip, '\n');
+					//load.remove('\n')
 				}
 			}
 
