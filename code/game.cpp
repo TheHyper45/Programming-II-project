@@ -45,31 +45,24 @@ namespace core {
 		float rotation;
 		float direction;
 	};
-	pole mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
+	pole mapArray[Background_Tile_Count_X*2 ][Background_Tile_Count_Y*2 ];
 	playerstatus playerstatus1= { 0,0,0,0,0 };
-	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X*2 ][Background_Tile_Count_Y*2 ])
 	{
 		int toenumint,b,c;
 		b = Background_Tile_Count_X * 2;
-		b = b ;
+		//b = b ;
 		c = Background_Tile_Count_Y * 2;
-		c = c ;
+		//c = c ;
 		std::ofstream save;
 		save.open(filename, std::ios::out);
 		if (save.good())
 		{
-			for (int i = 0; i < Background_Tile_Count_X * 2; i++)
+			for (int i = 0; i < Background_Tile_Count_X*2 ; i++)
 			{
-				for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
+				for (int j = 0; j < Background_Tile_Count_Y*2 ; j++)
 				{
-					if (j > 0 || i > 0 || j < b || i < c)
-					{
-						polemap[i][j].sprite_layer_index = 1;
-					}
-					else
-					{
-						polemap[i][j].sprite_layer_index = 0;
-					}
+					polemap[i][j].sprite_layer_index = j;
 					//save << "{";
 					save << polemap[i][j].sprite_layer_index << ",";
 					save << polemap[i][j].health << ",";
@@ -383,8 +376,8 @@ namespace core {
 //Game_1player
 		case Scene::Game_1player:
 			int a, b;
-			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y; j += 1) 
+			for (float i = 0; i < Background_Tile_Count_X*2; i += 1) {
+				for (float j = 0; j < Background_Tile_Count_Y*2; j += 1) 
 				{
 					a = static_cast<int>(i);
 					b = static_cast<int>(j);
@@ -425,8 +418,8 @@ namespace core {
 		{
 			int c, d;
 			//drawing texture number 1;
-			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y; j += 1)
+			for (float i = 0; i < Background_Tile_Count_X*2; i += 1) {
+				for (float j = 0; j < Background_Tile_Count_Y*2; j += 1)
 				{
 					c = static_cast<int>(i);
 					d = static_cast<int>(j);
