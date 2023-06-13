@@ -433,25 +433,29 @@ namespace core {
 				menu_choice--;
 				//printf("menu choice: %d\n", menu_choice);
 				if (menu_choice < 1) {
-					menu_choice+=3;
+					menu_choice+=4;
 				}
 			}
 			if (platform->was_key_pressed(core::Keycode::Up)) {
 				menu_choice++;
-				if (menu_choice >4) {
-					menu_choice -=3;
+				if (menu_choice >5) {
+					menu_choice -=4;
 				}
 				//printf("menu choice: %d\n", menu_choice);
 			}
 			if (platform->was_key_pressed(core::Keycode::Return)) {
 				//printf("Execute choice: %d\n", menu_choice);
-				if (menu_choice==3||menu_choice==0) {
+				if (menu_choice==1) {
 					scene = Scene::Select_Level_1player;
 				}
 				if (menu_choice == 2) {
 					scene = Scene::Select_Level_2player;
 				}
-				if (menu_choice == 1||menu_choice==4) {
+				if (menu_choice ==3) {
+					scene = Scene::Load_game;
+				}
+				if (menu_choice == 4)
+				{
 					scene = Scene::Construction;
 				}
 			}
