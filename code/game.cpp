@@ -32,6 +32,93 @@ namespace core {
 	static constexpr Vec2 Player_Tank_Bullet_Firing_Positions[] = {{0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f}};
 	static constexpr Vec2 Second_Player_Tank_Bullet_Firing_Positions[] = { {0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f} };
 
+	Tile mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
+	void saveTheMap(std::string filename, Tile mapArraytemp[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
+	{
+
+
+		std::ofstream save;
+		save.open(filename, std::ios::out);
+		if (save.good())
+		{
+			for (int i = 0; i < Background_Tile_Count_X * 2; i++)
+			{
+				for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
+				{
+
+					save << mapArraytemp[i][j].template_index << ",";
+					save << mapArraytemp[i][j].health << ",";
+					save << ";";
+
+				}
+				save << "\n";
+			}
+
+		}
+		else
+		{
+			exit(EXIT_FAILURE);
+		}
+		save.close();
+		//return mapArraytemp[Background_Tile_Count_Y][Background_Tile_Count_X];
+	}
+	Tile** loadMap(std::string filename)
+	{
+		Tile** arr = new Tile * [Background_Tile_Count_X * 2];
+		std::string readdata;//data read from the file
+		int passed;//data passed that are meant to be loaded into the array
+		int tempint;
+		std::ifstream load;
+		load.open(filename);
+		if (load.good())
+		{
+			if (load.eof())
+			{
+				exit;
+			}
+			else
+			{
+				for (int i = 0; i < Background_Tile_Count_X * 2; i++)
+				{
+					arr[i] = new Tile[Background_Tile_Count_Y * 2];
+					for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
+					{
+						if (j == 10 && i == 8)
+						{
+							tempint = 10;
+							continue;
+
+						}
+						else
+						{
+							getline(load, readdata, ',');
+							passed = std::stoi(readdata);
+							arr[i][j].template_index = passed;
+							getline(load, readdata, ',');
+							passed = std::stoi(readdata);
+							arr[i][j].health = passed;
+						}
+
+
+					}
+					if (tempint == 10 && i == 8)
+					{
+						tempint = 0;
+						continue;
+					}
+					else
+					{
+						getline(load, readdata, '\n');
+					}
+				}
+			}
+		}
+		return arr;
+
+
+	}
+
+
 	Game::Game(Renderer* _renderer,Platform* _platform) : renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),
 		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
 		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),eagle(),game_lose_timer(),spawn_effects() {
@@ -750,12 +837,16 @@ namespace core {
 							if(construction_current_tile_template_index != Invalid_Tile_Index) {
 								Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
 								tile.template_index = construction_current_tile_template_index;
+								mapArray[construction_marker_pos.x][construction_marker_pos.y].template_index = construction_current_tile_template_index;
 								tile.health = tile_templates[tile.template_index].health;
+								mapArray[construction_marker_pos.x][construction_marker_pos.y].health = tile_templates[tile.template_index].health;
 							}
 						}
 						if(platform->was_key_pressed(Keycode::Mouse_Right)) {
 							Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
 							tile.template_index = Invalid_Tile_Index;
+							mapArray[construction_marker_pos.x][construction_marker_pos.y].template_index = Invalid_Tile_Index;
+							mapArray[construction_marker_pos.x][construction_marker_pos.y].health = 0;
 						}
 						if(platform->was_key_pressed(Keycode::Mouse_Middle)) {
 							Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
