@@ -94,6 +94,7 @@ namespace core {
 		Game(Renderer* _renderer,Platform* _platform);
 
 		void update(float delta_time);
+		void update_2players(float delta_time);
 		void render(float delta_time);
 		[[nodiscard]] bool quit_requested() const noexcept;
 	private:
@@ -121,7 +122,9 @@ namespace core {
 		bool quit;
 		Tile tiles[(Background_Tile_Count_X * 2) * (Background_Tile_Count_Y * 2)];
 		std::uint32_t player_lifes;
+		std::uint32_t second_player_lifes;
 		Tank player_tank;
+		Tank second_tank;
 		Eagle eagle;
 		std::vector<Bullet> bullets;
 		std::vector<Tank> enemy_tanks;
