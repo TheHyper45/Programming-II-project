@@ -7,11 +7,6 @@
 #include "game.hpp"
 #include "exceptions.hpp"
 
-/*# index is_player type (bb right) (bb down) (bb left) (bb up)
-
-0 1 tank (0.03125 0.0625 0.84375 0.875) (0.0625 0.03125 0.875 0.84375) (0.125 0.0625 0.84375 0.875) (0.0625 0.125 0.875 0.84375)
-10 0 bullet (0.28125 0.4375 0.40625 0.1875) (0.4375 0.28125 0.1875 0.40625) (0.3125 0.40625 0.40625 0.1875) (0.4375 0.3125 0.1875 0.40625)
-6 0 tank (0.03125 0.0625 0.84375 0.875) (0.0625 0.03125 0.875 0.84375) (0.125 0.0625 0.84375 0.875) (0.0625 0.125 0.875 0.84375)*/
 
 namespace core {
 	static constexpr float Main_Menu_First_Option_Y_Offset = 6.0f;
@@ -30,9 +25,6 @@ namespace core {
 	static constexpr std::uint32_t Spawn_Effect_Layer_Count = 7;
 	static constexpr float Spawn_Effect_Frame_Duration = 0.1f;
 
-	//static constexpr Rect Player_Tank_Bounding_Boxes[] = {{0.03125f,0.0625f,0.84375f,0.875f},{0.0625f,0.03125f,0.875f,0.84375f},{0.125f,0.0625f,0.84375f,0.875f},{0.0625f,0.125f,0.875f,0.84375f}};
-	//static constexpr Rect Enemy_Tank_Bounding_Boxes[] = {{0.03125f,0.0625f,0.84375f,0.875f},{0.0625f,0.03125f,0.875f,0.84375f},{0.125f,0.0625f,0.84375f,0.875f},{0.0625f,0.125f,0.875f,0.84375f}};
-	
 	//Bounding boxes for each 'Entity_Direction' value in order.
 	static constexpr Rect Bullet_Bounding_Boxes[] = {{0.28125f,0.4375f,0.40625f,0.1875f},{0.4375f,0.28125f,0.1875f,0.40625f},{0.3125f,0.40625f,0.40625f,0.1875f},{0.4375f,0.3125f,0.1875f,0.40625f}};
 
@@ -44,7 +36,11 @@ namespace core {
 		tiles_texture = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
 		construction_place_marker = renderer->sprite("./assets/marker.bmp");
 		entity_sprites = renderer->sprite_atlas("./assets/entities_32x32.bmp",32);
+<<<<<<< HEAD
 		spawn_effect_sprite_atlas = renderer->sprite_atlas("./assets/spawn_effect_32x32.bmp",32);
+=======
+		explosion_sprite = renderer->sprite_atlas("./assets/explosions_16x16.bmp", 16);
+>>>>>>> 0a39a9ad0ad2c21d441a1c788ffadf94acd31c9f
 
 		{
 			static constexpr const char* Tiles_Info_File_Path = "./assets/tiles_16x16.txt";
@@ -320,6 +316,7 @@ namespace core {
 							if(tile.template_index == Invalid_Tile_Index) continue;
 
 							const auto& tile_template = tile_templates[tile.template_index];
+<<<<<<< HEAD
 							if(tile_template.flag != Tile_Flag::Solid) continue;
 
 							//bullet.position.x = end_x / 2.0f - Bullet_Size.x / 2.0f - 0.001f;
@@ -374,6 +371,12 @@ namespace core {
 							bullet.destroyed = true;
 							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
 							else tile.health -= 1;
+=======
+							if (tile_template.flag == Tile_Flag::Solid) {
+								explosions.push_back({ {bullet.position.x,bullet.position.y,0.3f},{1.0f,1.0f},1.0f,0,0,((int)(delta_time * 16384) % 8) });
+								bullet.destroyed = true;
+							}
+>>>>>>> 0a39a9ad0ad2c21d441a1c788ffadf94acd31c9f
 						}
 					}
 				}
@@ -505,6 +508,24 @@ namespace core {
 				for(const auto& bullet : bullets) {
 					renderer->draw_sprite({bullet.position.x,bullet.position.y},{1.0f,1.0f},core::entity_direction_to_rotation(bullet.dir),entity_sprites,Bullet_Sprite_Layer_Index);
 				}
+<<<<<<< HEAD
+=======
+//explosion
+				for (auto& explosion : explosions) {
+					renderer->draw_sprite(explosion.position, explosion.size, 0, explosion_sprite, explosion.sprite_index);
+					explosion.sprite_index = 8*explosion.testure_serie+(7 - (int)(explosion.timer * 8));
+					explosion.timer -= delta_time;
+					printf("%f texture: %d random number %d\n",explosion.timer,explosion.sprite_index, (int)(delta_time*16384)%8);
+					if (explosion.timer < 0) {
+						explosion.destroyed = 1;
+					}
+
+				}
+
+				std::erase_if(explosions, [](const Explosion& explosion) { return explosion.destroyed; });
+
+
+>>>>>>> 0a39a9ad0ad2c21d441a1c788ffadf94acd31c9f
 				if(!eagle.destroyed) {
 					renderer->draw_sprite({eagle.position.x,eagle.position.y,0.5f},Eagle_Size,0.0f,entity_sprites,Eagle_Sprite_Layer_Index);
 				}
