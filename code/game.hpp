@@ -84,7 +84,7 @@ namespace core {
 		void render(float delta_time);
 		[[nodiscard]] bool quit_requested() const noexcept;
 	private:
-		void upadate_player(float delta_time);
+		void update_player(float delta_time);
 		static inline constexpr std::uint32_t Invalid_Tile_Index = std::uint32_t(-1);
 
 		Renderer* renderer;

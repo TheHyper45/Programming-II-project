@@ -98,7 +98,7 @@ namespace core {
 		}
 	}
 
-	void Game::upadate_player(float delta_time) {
+	void Game::update_player(float delta_time) {
 		Vec2 forward = {};
 		if(platform->is_key_down(Keycode::Right) || platform->is_key_down(Keycode::D)) {
 			player_tank.dir = Entity_Direction::Right;
@@ -126,60 +126,58 @@ namespace core {
 
 		player_tank.position.x += forward.x * Tank_Speed * delta_time;
 		player_tank.position.y += forward.y * Tank_Speed * delta_time;
-		Rect player_tank_rect = {player_tank.position.x - Tank_Size.x / 2.0f,player_tank.position.y - Tank_Size.y / 2.0f,Tank_Size.x,Tank_Size.y};
 
-		Rect eagle_rect = {eagle.position.x - Eagle_Size.x / 2.0f,eagle.position.y - Eagle_Size.y / 2.0f,Eagle_Size.x,Eagle_Size.y};
-		if(!eagle.destroyed && player_tank_rect.overlaps(eagle_rect)) {
-			switch(player_tank.dir) {
-				case Entity_Direction::Right: { player_tank.position.x = eagle.position.x - 1.0f; break; }
-				case Entity_Direction::Down: { player_tank.position.y = eagle.position.y - 1.0f; break; }
-				case Entity_Direction::Left: { player_tank.position.x = eagle.position.x + 1.0f; break; }
-				case Entity_Direction::Up: { player_tank.position.y = eagle.position.y + 1.0f; break; }
+		std::int32_t start_x = std::int32_t((player_tank.position.x - Tank_Size.x / 2.0f) * 2.0f);
+		std::int32_t start_y = std::int32_t((player_tank.position.y - Tank_Size.y / 2.0f) * 2.0f);
+		std::int32_t end_x = std::int32_t((player_tank.position.x + Tank_Size.x / 2.0f) * 2.0f);
+		std::int32_t end_y = std::int32_t((player_tank.position.y + Tank_Size.y / 2.0f) * 2.0f);
+
+		if(player_tank.dir == Entity_Direction::Right && (end_x >= 0 && end_x < Background_Tile_Count_X * 2)) {
+			for(std::int32_t y = start_y;y <= end_y;y += 1) {
+				if(y < 0 || y >= Background_Tile_Count_Y * 2) continue;
+				const auto& tile = tiles[y * (Background_Tile_Count_X * 2) + end_x];
+				if(tile.template_index == Invalid_Tile_Index) continue;
+
+				const auto& tile_template = tile_templates[tile.template_index];
+				if(tile_template.flag != Tile_Flag::Solid) continue;
+
+				player_tank.position.x = end_x / 2.0f - Tank_Size.x / 2.0f - 0.001f;
 			}
 		}
+		if(player_tank.dir == Entity_Direction::Down && (end_y >= 0 && end_y < Background_Tile_Count_Y * 2)) {
+			for(std::int32_t x = start_x;x <= end_x;x += 1) {
+				if(x < 0 || x >= Background_Tile_Count_X * 2) continue;
+				const auto& tile = tiles[end_y * (Background_Tile_Count_X * 2) + x];
+				if(tile.template_index == Invalid_Tile_Index) continue;
 
-		const auto& relative_bounding_box = Rect{0,0,1,1};
-		Point upper_right = {
-			std::uint32_t(((player_tank.position.x - Tank_Size.x / 2.0f) + relative_bounding_box.x + relative_bounding_box.width) * 2.0f),
-			std::uint32_t(((player_tank.position.y - Tank_Size.y / 2.0f) + relative_bounding_box.y) * 2.0f)
-		};
-		Point lower_right = {
-			std::uint32_t(((player_tank.position.x - Tank_Size.x / 2.0f) + relative_bounding_box.x + relative_bounding_box.width) * 2.0f),
-			std::uint32_t(((player_tank.position.y - Tank_Size.y / 2.0f) + relative_bounding_box.y + relative_bounding_box.height) * 2.0f)
-		};
-		Point upper_left = {
-			std::uint32_t(((player_tank.position.x - Tank_Size.x / 2.0f) + relative_bounding_box.x) * 2.0f),
-			std::uint32_t(((player_tank.position.y - Tank_Size.y / 2.0f) + relative_bounding_box.y) * 2.0f)
-		};
-		Point lower_left = {
-			std::uint32_t(((player_tank.position.x - Tank_Size.x / 2.0f) + relative_bounding_box.x) * 2.0f),
-			std::uint32_t(((player_tank.position.y - Tank_Size.y / 2.0f) + relative_bounding_box.y + relative_bounding_box.height) * 2.0f)
-		};
-
-		struct Point_Pair { Point a;Point b; };
-		Point_Pair pairs[] = {{upper_right,lower_right},{lower_right,lower_left},{upper_left,lower_left},{upper_left,upper_right}};
-		const Point_Pair& pair = pairs[std::size_t(player_tank.dir)];
-
-		Irect tile_screen_rect = {0.0f,0.0f,Background_Tile_Count_X * 2,Background_Tile_Count_Y * 2};
-		bool is_a_point = tile_screen_rect.point_inside(pair.a);
-		bool is_b_point = tile_screen_rect.point_inside(pair.b);
-		if(is_a_point || is_b_point) {
-			const auto& point = is_a_point ? pair.a : pair.b;
-			const auto& tile = tiles[point.y * (Background_Tile_Count_X * 2) + point.x];
-			if(tile.template_index != Invalid_Tile_Index) {
 				const auto& tile_template = tile_templates[tile.template_index];
-				if(tile_template.flag == Tile_Flag::Solid) {
-					switch(player_tank.dir) {
-						case Entity_Direction::Right: {
-							player_tank.position.x = point.x / 2.0f - Tank_Size.x / 2.0f;
-							break;
-						}
-						case Entity_Direction::Down: {
-							player_tank.position.y = point.y / 2.0f - Tank_Size.y / 2.0f;
-							break;
-						}
-					}
-				}
+				if(tile_template.flag != Tile_Flag::Solid) continue;
+
+				player_tank.position.y = end_y / 2.0f - Tank_Size.y / 2.0f - 0.001f;
+			}
+		}
+		if(player_tank.dir == Entity_Direction::Left && (start_x >= 0 && start_x < Background_Tile_Count_X * 2)) {
+			for(std::int32_t y = start_y;y <= end_y;y += 1) {
+				if(y < 0 || y >= Background_Tile_Count_Y * 2) continue;
+				const auto& tile = tiles[y * (Background_Tile_Count_X * 2) + start_x];
+				if(tile.template_index == Invalid_Tile_Index) continue;
+
+				const auto& tile_template = tile_templates[tile.template_index];
+				if(tile_template.flag != Tile_Flag::Solid) continue;
+
+				player_tank.position.x = start_x / 2.0f + Tank_Size.x + 0.001f;
+			}
+		}
+		if(player_tank.dir == Entity_Direction::Up && (start_y >= 0 && start_y < Background_Tile_Count_Y * 2)) {
+			for(std::int32_t x = start_x;x <= end_x;x += 1) {
+				if(x < 0 || x >= Background_Tile_Count_X * 2) continue;
+				const auto& tile = tiles[start_y * (Background_Tile_Count_X * 2) + x];
+				if(tile.template_index == Invalid_Tile_Index) continue;
+
+				const auto& tile_template = tile_templates[tile.template_index];
+				if(tile_template.flag != Tile_Flag::Solid) continue;
+
+				player_tank.position.y = start_y / 2.0f + Tank_Size.y + 0.001f;
 			}
 		}
 	}
@@ -262,6 +260,7 @@ namespace core {
 					}
 
 					tiles[6 * (Background_Tile_Count_X * 2) + 8] = Tile{0};
+					tiles[6 * (Background_Tile_Count_X * 2) + 11] = Tile{0};
 
 					eagle.destroyed = false;
 					eagle.position = {Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f};
@@ -276,19 +275,19 @@ namespace core {
 				break;
 			}
 			case Scene::Game_1player: {
-				upadate_player(delta_time);
+				update_player(delta_time);
 
 				Rect screen_rect = {0.0f,0.0f,float(Background_Tile_Count_X),float(Background_Tile_Count_Y)};
-				Irect tile_screen_rect = {0.0f,0.0f,Background_Tile_Count_X * 2,Background_Tile_Count_Y * 2};
+				Urect tile_screen_rect = {0.0f,0.0f,Background_Tile_Count_X * 2,Background_Tile_Count_Y * 2};
 				for(auto& bullet : bullets) {
 					bullet.position += core::entity_direction_to_vector(bullet.dir) * Bullet_Speed * delta_time;
+					const auto& relative_bounding_box = Bullet_Bounding_Boxes[std::size_t(bullet.dir)];
 
-					const auto& relative_bullet_rect = Bullet_Bounding_Boxes[std::size_t(bullet.dir)];
 					Rect bullet_rect = {
-						bullet.position.x - Bullet_Size.x / 2.0f + relative_bullet_rect.x,
-						bullet.position.y - Bullet_Size.y / 2.0f + relative_bullet_rect.y,
-						relative_bullet_rect.width,
-						relative_bullet_rect.height
+						bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x,
+						bullet.position.y - Bullet_Size.y / 2.0f + relative_bounding_box.y,
+						relative_bounding_box.width,
+						relative_bounding_box.height
 					};
 					if(!screen_rect.overlaps(bullet_rect)) bullet.destroyed = true;
 
@@ -300,37 +299,73 @@ namespace core {
 						game_lose_timer = Time_To_Lose;
 						continue;
 					}
-
-					const auto& relative_bounding_box = Bullet_Bounding_Boxes[std::size_t(bullet.dir)];
-					Point upper_right = {
-						std::uint32_t(((bullet.position.x - Bullet_Size.x / 2.0f) + relative_bounding_box.x + relative_bounding_box.width) * 2.0f),
-						std::uint32_t(((bullet.position.y - Bullet_Size.y / 2.0f) + relative_bounding_box.y) * 2.0f)
-					};
-					Point lower_right = {
-						std::uint32_t(((bullet.position.x - Bullet_Size.x / 2.0f) + relative_bounding_box.x + relative_bounding_box.width) * 2.0f),
-						std::uint32_t(((bullet.position.y - Bullet_Size.y / 2.0f) + relative_bounding_box.y + relative_bounding_box.height) * 2.0f)
-					};
-					Point upper_left = {
-						std::uint32_t(((bullet.position.x - Bullet_Size.x / 2.0f) + relative_bounding_box.x) * 2.0f),
-						std::uint32_t(((bullet.position.y - Bullet_Size.y / 2.0f) + relative_bounding_box.y) * 2.0f)
-					};
-					Point lower_left = {
-						std::uint32_t(((bullet.position.x - Bullet_Size.x / 2.0f) + relative_bounding_box.x) * 2.0f),
-						std::uint32_t(((bullet.position.y - Bullet_Size.y / 2.0f) + relative_bounding_box.y + relative_bounding_box.height) * 2.0f)
-					};
-
-					struct Point_Pair { Point a;Point b; };
-					Point_Pair pairs[] = {{upper_right,lower_right},{lower_right,lower_left},{upper_left,lower_left},{upper_left,upper_right}};
-					const Point_Pair& pair = pairs[std::size_t(bullet.dir)];
 					
-					bool is_a_point = tile_screen_rect.point_inside_inclusive(pair.a);
-					bool is_b_point = tile_screen_rect.point_inside_inclusive(pair.b);
-					if(is_a_point || is_b_point) {
-						const auto& point = is_a_point ? pair.a : pair.b;
-						const auto& tile = tiles[point.y * (Background_Tile_Count_X * 2) + point.x];
-						if(tile.template_index != Invalid_Tile_Index) {
+					std::int32_t start_x = std::int32_t((bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x) * 2.0f);
+					std::int32_t start_y = std::int32_t((bullet.position.y - Bullet_Size.y / 2.0f + relative_bounding_box.y) * 2.0f);
+					std::int32_t end_x = std::int32_t((bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x + relative_bounding_box.width) * 2.0f);
+					std::int32_t end_y = std::int32_t((bullet.position.y - Bullet_Size.y / 2.0f + relative_bounding_box.y + relative_bounding_box.height) * 2.0f);
+
+					if(bullet.dir == Entity_Direction::Right && (end_x >= 0 && end_x < Background_Tile_Count_X * 2)) {
+						for(std::int32_t y = start_y;y <= end_y;y += 1) {
+							if(y < 0 || y >= Background_Tile_Count_Y * 2) continue;
+							auto& tile = tiles[y * (Background_Tile_Count_X * 2) + end_x];
+							if(tile.template_index == Invalid_Tile_Index) continue;
+
 							const auto& tile_template = tile_templates[tile.template_index];
-							if(tile_template.flag == Tile_Flag::Solid) bullet.destroyed = true;
+							if(tile_template.flag != Tile_Flag::Solid) continue;
+
+							//bullet.position.x = end_x / 2.0f - Bullet_Size.x / 2.0f - 0.001f;
+							bullet.destroyed = true;
+							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							else tile.health -= 1;
+						}
+					}
+					if(bullet.dir == Entity_Direction::Down && (end_y >= 0 && end_y < Background_Tile_Count_Y * 2)) {
+						for(std::int32_t x = start_x;x <= end_x;x += 1) {
+							if(x < 0 || x >= Background_Tile_Count_X * 2) continue;
+							auto& tile = tiles[end_y * (Background_Tile_Count_X * 2) + x];
+							if(tile.template_index == Invalid_Tile_Index) continue;
+
+							const auto& tile_template = tile_templates[tile.template_index];
+							if(tile_template.flag != Tile_Flag::Solid) continue;
+
+							//bullet.position.y = end_y / 2.0f - Bullet_Size.y / 2.0f - 0.001f;
+
+							bullet.destroyed = true;
+							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							else tile.health -= 1;
+						}
+					}
+					if(bullet.dir == Entity_Direction::Left && (start_x >= 0 && start_x < Background_Tile_Count_X * 2)) {
+						for(std::int32_t y = start_y;y <= end_y;y += 1) {
+							if(y < 0 || y >= Background_Tile_Count_Y * 2) continue;
+							auto& tile = tiles[y * (Background_Tile_Count_X * 2) + start_x];
+							if(tile.template_index == Invalid_Tile_Index) continue;
+
+							const auto& tile_template = tile_templates[tile.template_index];
+							if(tile_template.flag != Tile_Flag::Solid) continue;
+
+							//bullet.position.x = start_x / 2.0f + Bullet_Size.x + 0.001f;
+
+							bullet.destroyed = true;
+							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							else tile.health -= 1;
+						}
+					}
+					if(bullet.dir == Entity_Direction::Up && (start_y >= 0 && start_y < Background_Tile_Count_Y * 2)) {
+						for(std::int32_t x = start_x;x <= end_x;x += 1) {
+							if(x < 0 || x >= Background_Tile_Count_X * 2) continue;
+							auto& tile = tiles[start_y * (Background_Tile_Count_X * 2) + x];
+							if(tile.template_index == Invalid_Tile_Index) continue;
+
+							const auto& tile_template = tile_templates[tile.template_index];
+							if(tile_template.flag != Tile_Flag::Solid) continue;
+
+							//bullet.position.y = start_y / 2.0f + Bullet_Size.y + 0.001f;
+
+							bullet.destroyed = true;
+							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							else tile.health -= 1;
 						}
 					}
 				}
@@ -383,7 +418,7 @@ namespace core {
 					for(std::size_t i = 0;i < tile_templates.size();i += 1) {
 						const Tile_Template& elem = tile_templates[i];
 
-						Irect rect = {
+						Urect rect = {
 							std::uint32_t((1.0f + offset.x) * tile_width + dims.x),
 							std::uint32_t((1.0f + offset.y) * tile_height + dims.y),
 							tile_width,
@@ -452,7 +487,6 @@ namespace core {
 				for(const auto& bullet : bullets) {
 					renderer->draw_sprite({bullet.position.x,bullet.position.y},{1.0f,1.0f},core::entity_direction_to_rotation(bullet.dir),entity_sprites,Bullet_Sprite_Layer_Index);
 				}
-
 				if(!eagle.destroyed) {
 					renderer->draw_sprite({eagle.position.x,eagle.position.y,0.5f},Eagle_Size,0.0f,entity_sprites,Eagle_Sprite_Layer_Index);
 				}

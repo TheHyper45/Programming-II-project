@@ -52,7 +52,7 @@ namespace core {
 		std::uint32_t font_largest_y_baseline_offset;
 		GLint time_uniform_location;
 		float time;
-		Irect render_rect;
+		Urect render_rect;
 	};
 
 	static constexpr const char Vertex_Shader_Source_Format[] = R"xxx(
@@ -664,7 +664,7 @@ namespace core {
 		glUniformMatrix4fv(glGetUniformLocation(data.shader_program,"projection_matrix"),1,GL_FALSE,&matrix(0,0));
 	}
 
-	Irect Renderer::render_client_rect_dimensions() const noexcept {
+	Urect Renderer::render_client_rect_dimensions() const noexcept {
 		const Renderer_Internal_Data& data = *std::launder(reinterpret_cast<const Renderer_Internal_Data*>(data_buffer));
 		return data.render_rect;
 	}

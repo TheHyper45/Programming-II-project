@@ -64,7 +64,23 @@ namespace core {
 		std::uint32_t x;
 		std::uint32_t y;
 	};
+	struct Ipoint {
+		std::int32_t x;
+		std::int32_t y;
+	};
 	struct Irect {
+		std::int32_t x;
+		std::int32_t y;
+		std::int32_t width;
+		std::int32_t height;
+		[[nodiscard]] bool point_inside(Ipoint point) const noexcept {
+			return point.x > x && point.x < (x + width) && point.y > y && point.y < (y + height);
+		}
+		[[nodiscard]] bool point_inside_inclusive(Ipoint point) const noexcept {
+			return point.x >= x && point.x <= (x + width) && point.y >= y && point.y <= (y + height);
+		}
+	};
+	struct Urect {
 		std::uint32_t x;
 		std::uint32_t y;
 		std::uint32_t width;

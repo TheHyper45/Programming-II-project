@@ -40,7 +40,7 @@ namespace core {
 		[[nodiscard]] Sprite_Index sprite(const char* file_path);
 		[[nodiscard]] Sprite_Index sprite_atlas(const char* file_path,std::uint32_t tile_dimension);
 
-		[[nodiscard]] Irect render_client_rect_dimensions() const noexcept;
+		[[nodiscard]] Urect render_client_rect_dimensions() const noexcept;
 	private:
 		Platform* platform;
 		/*	An object of type 'Renderer_Internal_Data' is placement-newed inside this array internally.
