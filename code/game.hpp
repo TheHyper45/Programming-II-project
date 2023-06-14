@@ -1,108 +1,114 @@
 #ifndef GAME_HPP
 #define GAME_HPP
-#include "renderer.hpp"
+
+#include <list>
+#include <vector>
+#include <cstddef>
 #include "platform.hpp"
-//#include <list>
-#include <fstream>
-#include <string>
-#include <iostream>
+#include "renderer.hpp"
 
 namespace core {
 	enum class Scene {
 		Main_Menu,
-		Select_Level_1player,
+		Intro_1player,
 		Game_1player,
-		Select_Level_2player,
+		Outro_1player,
+		Intro_2player,
 		Game_2player,
+		Outro_2players,
 		Construction,
-		//Load_game,
+		Level_Selection,
+		Game_Over
+	};
+
+	enum struct Tile_Flag {
+		Solid,
+		Below,
+		Above,
+		Bulletpass
+	};
+	struct Tile_Template {
+		std::uint32_t tile_layer_index;
+		std::uint32_t health;
+		float rotation;
+		Tile_Flag flag;
+	};
+	struct Tile {
+		std::uint32_t template_index;
+		std::uint32_t health;
+	};
+
+	enum class Entity_Direction { Right,Down,Left,Up };
+	[[nodiscard]] inline float entity_direction_to_rotation(Entity_Direction dir) {
+		switch(dir) {
+			case Entity_Direction::Right: return PI / 2.0f;
+			case Entity_Direction::Down: return PI;
+			case Entity_Direction::Left: return -PI / 2.0f;
+			case Entity_Direction::Up: return 0.0f;
+			default: return 0.0f;
+		}
+	}
+	[[nodiscard]] inline Vec2 entity_direction_to_vector(Entity_Direction dir) {
+		switch(dir) {
+			case Entity_Direction::Right: return {1.0f,0.0f};
+			case Entity_Direction::Down: return {0.0f,1.0f};
+			case Entity_Direction::Left: return {-1.0f,0.0f};
+			case Entity_Direction::Up: return {0.0f,-1.0f};
+			default: return {};
+		}
+	}
+
+	struct Tank {
+		Vec2 position;
+		Entity_Direction dir;
+		bool destroyed;
+	};
+	struct Bullet {
+		Vec2 position;
+		Entity_Direction dir;
+		bool fired_by_player;
+		bool destroyed;
+	};
+	struct Eagle {
+		Vec2 position;
+		bool destroyed;
 	};
 
 	class Game {
 	public:
-		void menu();
-		void graphics(float delta_time);
-		void logic();
+		Game(const Game&) = delete;
+		Game& operator=(const Game&) = delete;
+		Game(Renderer* _renderer,Platform* _platform);
 
-		bool fully_on_screen(Vec3 position, Vec2 size);
-		bool on_screen(Vec3 position, Vec2 size);
-		bool collision(Vec3 position1, Vec2 size1, Vec3 position2, Vec2 size2);
-		bool collision(Vec3 position1, Vec2 size1, Vec3 circle_position, float radius);
-		bool collision(Vec3 circle_position1, float radius1, Vec3 circle_position2, float radius2);
-		Game(core::Renderer* renderer,core::Platform* platform);
-		
-		class Tank {
-		public:
-			std::int32_t sprite_index = 15;
-			Vec3 position = { 7.5f,10.5f,0 };
-			float rotation = 0;
-			Vec2 size = { 1.0f,1.0f };
-			Vec2 hitbox = { 0.9f,0.9f };
-			float direction = 0;
-			float distance_to_travel = 0;
-			void move(float direction);
-			void move_one(float direction);
-			void animate(float delta_time);
-			void go(float delta_time);
-			void shoot();
-			void destroyed();
-			
-
-			
-		};
-
-		
-		class Enemy_Tank {
-		public:
-			std::int32_t sprite_index = 14;
-			Vec3 position = { 0.5f,0.5f,0 };
-			float rotation = 0;
-			Vec2 size = { 1.0f,1.0f };
-			float direction = 0;
-			float distance_to_travel = 0;
-			int inteligence = 0;
-			int speed = 1;
-			int durability = 1;
-			int dmg = 100;
-			Vec2 hitbox = { 1.0f,1.0f };
-			float reloading_time = 10;
-			
-	
-			Enemy_Tank(const std::int32_t& sprite_index, const Vec3& position, float rotation, const Vec2& size, float direction, float distance_to_travel, int inteligence, int speed, int durability, int dmg, float reloading_time)
-				: sprite_index(sprite_index), position(position), rotation(rotation), size(size), direction(direction), distance_to_travel(distance_to_travel), inteligence(inteligence), speed(speed), durability(durability), dmg(dmg), reloading_time(reloading_time)
-			{}
-			Enemy_Tank(const std::int32_t& sprite_index, const Vec3& position)
-				: sprite_index(sprite_index), position(position)
-			{}
-
-			bool operator == (const Enemy_Tank& b) const {
-				return position.x == b.position.x && position.y == b.position.y && position.z == b.position.z &&
-					size.x == b.size.x && size.y == b.size.y && rotation==b.rotation;
-			};
-		};
-		class Barrel {
-		public:
-			std::int32_t sprite_index=18;
-			Vec3 position;
-			Vec2 size;
-			float hitbox_radius = 0.5f;
-
-			bool operator == (const Barrel& b) const {
-				return position.x == b.position.x && position.y == b.position.y && position.z == b.position.z &&
-					size.x == b.size.x && size.y == b.size.y && hitbox_radius == b.hitbox_radius;
-			};
-		};
-
+		void update(float delta_time);
+		void render(float delta_time);
+		[[nodiscard]] bool quit_requested() const noexcept;
 	private:
-		Sprite_Index tiles_sprite_atlas;
-		Sprite_Index bullet_alias;
-		Sprite_Index player1_alias;
-		Sprite_Index eagle_alias;
-		Sprite_Index explosions_atlas;
+		void upadate_player(float delta_time);
+		static inline constexpr std::uint32_t Invalid_Tile_Index = std::uint32_t(-1);
+
 		Renderer* renderer;
 		Platform* platform;
 		Scene scene;
-		int menu_choice;
-		};
+		std::size_t current_main_menu_option;
+		float update_timer;
+		Sprite_Index tiles_texture;
+		Sprite_Index construction_place_marker;
+		Sprite_Index entity_sprites;
+		Point construction_marker_pos;
+		bool construction_choosing_tile;
+		Point construction_tile_choice_marker_pos;
+		std::uint32_t construction_current_tile_template_index;
+		std::vector<Tile_Template> tile_templates;
+		bool show_fps;
+		bool quit;
+		Tile tiles[(Background_Tile_Count_X * 2) * (Background_Tile_Count_Y * 2)];
+		std::uint32_t player_lifes;
+		Tank player_tank;
+		Eagle eagle;
+		std::vector<Bullet> bullets;
+		std::vector<Tank> enemy_tanks;
+		float game_lose_timer;
+	};
 }
 #endif

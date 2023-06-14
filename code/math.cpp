@@ -71,6 +71,23 @@ namespace core {
 		return result;
 	}
 
+	float magnitude(Vec2 v) {
+		return std::sqrt(v.x * v.x + v.y * v.y);
+	}
+
+	Vec2 normalize(Vec2 v) {
+		float mag = core::magnitude(v);
+		return {v.x / mag,v.y / mag};
+	}
+
+	float dot(Vec2 a,Vec2 b) {
+		return a.x * b.x + a.y * b.y;
+	}
+
+	float distance(Vec2 a,Vec2 b) {
+		return std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+	}
+
 	std::uint32_t leading_zeroes(std::uint32_t value) {
 #if defined(_MSC_VER) && !defined(__clang__)
 		unsigned long result = 0;

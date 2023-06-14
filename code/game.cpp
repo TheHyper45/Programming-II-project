@@ -1,680 +1,530 @@
+#include <cstdio>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <iostream>
+#include <cinttypes>
 #include "game.hpp"
-#include <cmath>
-#include "math.hpp"
-#include <stdio.h>
-#include "bullets.hpp"
-#include <list>
-#define number_of_choices 3
-using namespace std;
+#include "exceptions.hpp"
+
+/*# index is_player type (bb right) (bb down) (bb left) (bb up)
+
+0 1 tank (0.03125 0.0625 0.84375 0.875) (0.0625 0.03125 0.875 0.84375) (0.125 0.0625 0.84375 0.875) (0.0625 0.125 0.875 0.84375)
+10 0 bullet (0.28125 0.4375 0.40625 0.1875) (0.4375 0.28125 0.1875 0.40625) (0.3125 0.40625 0.40625 0.1875) (0.4375 0.3125 0.1875 0.40625)
+6 0 tank (0.03125 0.0625 0.84375 0.875) (0.0625 0.03125 0.875 0.84375) (0.125 0.0625 0.84375 0.875) (0.0625 0.125 0.875 0.84375)*/
+
 namespace core {
-	core::Game::Tank tank;
-	//core::Game::Tank tank2;
-	std::list<Bullet> List_Of_Bullets{};
-	std::list<core::Game::Enemy_Tank> List_Of_Enemy_Tanks{};
-	std::list<core::Game::Barrel>List_Of_Barrels{};
-	Game::Game(Renderer* _renderer, Platform* _platform) :
-		renderer(_renderer), platform(_platform), scene(Scene::Main_Menu), menu_choice() {
-		tiles_sprite_atlas = renderer->sprite_atlas("./assets/tiles_16x16.bmp", 16);
-		player1_alias = renderer->sprite("./assets/player.bmp");
-		bullet_alias = renderer->sprite("./assets/bullet.bmp");
-		eagle_alias = renderer->sprite("./assets/eagle.bmp");
-		explosions_atlas = renderer->sprite_atlas("./assets/explosions_16x16.bmp", 16);
-	}
-	void Game::menu() {
-		menu_choice = 0;
-	}
+	static constexpr float Main_Menu_First_Option_Y_Offset = 6.0f;
+	static constexpr const char* Main_Menu_Options[] = {"1 player","2 players","Load Level","Construction","Quit"};
+	static constexpr std::size_t Main_Menu_Options_Count = sizeof(Main_Menu_Options) / sizeof(*Main_Menu_Options);
+	static constexpr float Tank_Speed = 4.0f;
+	static constexpr float Bullet_Speed = 12.0f;
+	static constexpr std::uint32_t Player_Tank_Sprite_Layer_Index = 0;
+	static constexpr std::uint32_t Enemy_Tank_Sprite_Layer_Index = 6;
+	static constexpr std::uint32_t Bullet_Sprite_Layer_Index = 10;
+	static constexpr std::uint32_t Eagle_Sprite_Layer_Index = 11;
+	static constexpr Vec2 Eagle_Size = {1.0f,1.0f};
+	static constexpr Vec2 Tank_Size = {1.0f,1.0f};
+	static constexpr Vec2 Bullet_Size = {1.0f,1.0f};
 
-	enum class Tile_flag
-	{
-		Solid,
-		Below,
-		Above,
-		Bulletpass,
-		Barrier,
-	};
-	struct pole
-	{
-		std::uint32_t sprite_layer_index;
-		std::uint32_t health;
-		Tile_flag flag;
-	};
-	struct playerstatus
-	{
-		float x;
-		float y;
-		float z;
-		float rotation;
-		float direction;
-	};
-	pole mapArray[Background_Tile_Count_X*2 ][Background_Tile_Count_Y*2 ];
-	playerstatus playerstatus1= { 0,0,0,0,0 };
-	void SaveMap(std::string filename, pole polemap[Background_Tile_Count_X*2 ][Background_Tile_Count_Y*2 ])
-	{
-		int toenumint,b,c;
-		b = Background_Tile_Count_X * 2;
-		//b = b ;
-		c = Background_Tile_Count_Y * 2;
-		//c = c ;
-		std::ofstream save;
-		save.open(filename, std::ios::out);
-		if (save.good())
-		{
-			for (int i = 0; i < Background_Tile_Count_X*2 ; i++)
-			{
-				for (int j = 0; j < Background_Tile_Count_Y*2 ; j++)
-				{
-					polemap[i][j].sprite_layer_index = j;
-					//save << "{";
-					save << polemap[i][j].sprite_layer_index << ",";
-					save << polemap[i][j].health << ",";
-					toenumint = static_cast<int>(polemap[i][j].flag);
-					std::cout << toenumint;
-					save << toenumint;
-					//save << toenumint << "}";
-					//save << polemap[i][j].flag;
-					save << ";";
-
-				}
-				save << "\n";
-			}
-
-		}
-		else
-		{
-			exit(EXIT_FAILURE);
-		}
-		save.close();
-	}
-	void savePlayerStatus(core::Game::Tank tank, string filename2)
-	{
-		float x, y, z, direction, rotation;
-		x = tank.position.x;
-		y = tank.position.y;
-		z = tank.position.z;
-		rotation = tank.rotation;
-		direction = tank.direction;
-		std::ofstream savestatus;
-		savestatus.open(filename2, std::ios::out);
-		if (savestatus.good())
-		{
-			savestatus << x << ",";
-			savestatus << y << ",";
-			savestatus << z << ",";
-			savestatus << direction << ",";
-			savestatus << rotation << ".";
-		}
-		else
-		{
-			exit(EXIT_FAILURE);
-		}
-		savestatus.close();
-
-	}
-	void SaveMenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2], core::Game::Tank tank)
-	{
-		int savechoice = 1;
-		
-		std::string filename,filename2;
-		
-		switch (savechoice)
-		{
-		case 1:
-		{
-			filename = "savefile1.txt";
-			filename2 = "statussave1.txt";
-			SaveMap(filename, polemap);
-			//savePlayerStatus(tank, filename2);
-
-		}
-		case 2 :
-		{
-			filename = "savefile2.txt";
-			filename2 = "statussave2.txt";
-			SaveMap(filename, polemap);
-			//savePlayerStatus(tank, filename2);
-		}
-		case 3:
-		{
-			filename = "savefile3.txt";
-			filename2 = "statussave3.txt";
-			SaveMap(filename, polemap);
-			//savePlayerStatus(tank, filename2);
-		}
-		default:
-		{
-			break;
-		}
-		}
-	}
+	//static constexpr Rect Player_Tank_Bounding_Boxes[] = {{0.03125f,0.0625f,0.84375f,0.875f},{0.0625f,0.03125f,0.875f,0.84375f},{0.125f,0.0625f,0.84375f,0.875f},{0.0625f,0.125f,0.875f,0.84375f}};
+	//static constexpr Rect Enemy_Tank_Bounding_Boxes[] = {{0.03125f,0.0625f,0.84375f,0.875f},{0.0625f,0.03125f,0.875f,0.84375f},{0.125f,0.0625f,0.84375f,0.875f},{0.0625f,0.125f,0.875f,0.84375f}};
 	
-	
-	pole mapload(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2], std::string mapchoice)
-	{
+	//Bounding boxes for each 'Entity_Direction' value in order.
+	static constexpr Rect Bullet_Bounding_Boxes[] = {{0.28125f,0.4375f,0.40625f,0.1875f},{0.4375f,0.28125f,0.1875f,0.40625f},{0.3125f,0.40625f,0.40625f,0.1875f},{0.4375f,0.3125f,0.1875f,0.40625f}};
 
-		std::ifstream load;
-		load.open(mapchoice);
-		std::string readdata, readhealth, readflag, readindex,skip;
-		int passedindex, passedhealth;
+	static constexpr Vec2 Player_Tank_Bullet_Firing_Positions[] = {{0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f}};
 
-		Tile_flag passedflag = Tile_flag::Solid;
-		if (load.good())
+	Game::Game(Renderer* _renderer,Platform* _platform) : renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),
+		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
+		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),eagle(),game_lose_timer() {
+		tiles_texture = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
+		construction_place_marker = renderer->sprite("./assets/marker.bmp");
+		entity_sprites = renderer->sprite_atlas("./assets/entities_32x32.bmp",32);
+
 		{
-			if (load.eof())
-			{
-				exit;
-			}
-			else
-			{
-				for (int i = 0; i < Background_Tile_Count_X * 2; i++)
-				{
-					for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
-					{
-						//std::getline(data, skip, '=')
-						getline(load, readdata, ',');
-						readindex = readdata;
-						getline(load, readdata, ',');
-						readhealth = readdata;
-						getline(load, readdata, ';');
-						readflag = readdata;
-						passedindex = std::stoi(readindex);
-						passedhealth = std::stoi(readhealth);
-						if (readflag == "Solid")
-						{
-							passedflag = Tile_flag::Solid;
-						}
-						else if (readflag == "Below")
-						{
-							passedflag = Tile_flag::Below;
-						}
-						else if (readflag == "Above")
-						{
-							passedflag = Tile_flag::Above;
-						}
-						else if (readflag == "Bulletpass")
-						{
-							passedflag = Tile_flag::Bulletpass;
-						}
-						else if(readflag =="Barrier")
-						{
-							passedflag = Tile_flag::Barrier;
-						}
-						
-						polemap[i][j].sprite_layer_index = passedindex;
-						polemap[i][j].health = passedhealth;
-						polemap[i][j].flag = passedflag;
-						/*
-		Solid,
-		Below,
-		Above,
-		Bulletpass,
-		Barrier,
-						*/
-					}
-					getline(load, skip, '\n');
-					//load.remove('\n')
+			static constexpr const char* Tiles_Info_File_Path = "./assets/tiles_16x16.txt";
+			std::ifstream file{Tiles_Info_File_Path,std::ios::binary};
+			if(!file.is_open()) throw File_Open_Exception(Tiles_Info_File_Path);
+
+			std::string line{};
+			while(std::getline(file,line)) {
+				//Skip comments.
+				if(line.size() < 2 || line[0] == '#') continue;
+
+				std::uint32_t index_buffer = 0;
+				char health_buffer[32] = {};
+				char flag_buffer[32] = {};
+				std::uint32_t rotation = 0;
+
+				int count = std::sscanf(line.c_str(),"%" SCNu32 " %31s %" SCNu32 " %31s",&index_buffer,health_buffer,&rotation,flag_buffer);
+				if(count < 0) throw File_Exception(Tiles_Info_File_Path,"Invalid format.");
+
+				Tile_Template tile_template{};
+				tile_template.tile_layer_index = index_buffer;
+
+				switch(rotation) {
+					case 0: tile_template.rotation = 0.0f; break;
+					case 1: tile_template.rotation = PI / 2.0f; break;
+					case 2: tile_template.rotation = PI; break;
+					case 3: tile_template.rotation = 3.0f * PI / 2.0f; break;
+					default: throw File_Exception(Tiles_Info_File_Path,"Invalid rotation value.");
 				}
-			}
 
-		}
-		else
-		{
-			exit(EXIT_FAILURE);
-		}
-		return polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
-	}
-	playerstatus loadstatus(std::string mapchoice ,playerstatus loaddata)
-	{
-		float x;
-		std::string readdata;
-		
-		std::ifstream loadstatus;
-		loadstatus.open(mapchoice);
-		if (loadstatus.good())
-		{
-			if (loadstatus.eof())
-			{
-				exit;
-			}
-			else
-			{
-				getline(loadstatus, readdata,',');
-				x = stof(readdata);
-				playerstatus1.x = x;
-				getline(loadstatus, readdata, ',');
-				x = stof(readdata);
-				playerstatus1.y = x;
-				getline(loadstatus, readdata, ',');
-				x = stof(readdata);
-				playerstatus1.z = x;
-				getline(loadstatus, readdata, ',');
-				x = stof(readdata);
-				playerstatus1.direction = x;
-				getline(loadstatus, readdata, '.');
-				x = stof(readdata);
-				playerstatus1.rotation = x;
-			}
-		}
-		else
-		{
-			exit(EXIT_FAILURE);
-		}
-		loadstatus.close();
-		return loaddata;
-	}
-	playerstatus loadstatusmenu(int mapchoiceint, playerstatus playerstatus1)
-	{
-		std::string mapchoice;
-		switch (mapchoiceint)
-		
-		{
-		case 1:
-		{
-			mapchoice = "statussave1.txt";
-			return loadstatus(mapchoice, playerstatus1);
-		}
-		case 2:
-		{
-			mapchoice = "statussave2.txt";
-			return loadstatus(mapchoice, playerstatus1);
-		}
-		case 3:
-		{
-			mapchoice = "statussave1.txt";
-			return loadstatus(mapchoice, playerstatus1);
-		}
-		default:
-			break;
-		}
-		
-	}
-	pole loadmenu(pole polemap[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2],int mapchoiceint)
-	{
-		int loadsavedorloadmap = 2;
-		std::string mapchoice;
-		
-		if (loadsavedorloadmap == 1)
-		{
-			switch (mapchoiceint)
+				if(std::strcmp(health_buffer,"-1") == 0) {
+					tile_template.health = std::uint32_t(-1);
+				}
+				else {
+					count = std::sscanf(health_buffer,"%" SCNu32,&tile_template.health);
+					if(count < 0) throw File_Exception(Tiles_Info_File_Path,"Invalid format.");
+				}
 
-			{
-			case 1:
-			{
-				mapchoice = "map1.txt";
-				return mapload(polemap, mapchoice);
-			}
-			case 2:
-			{
-				mapchoice = "map2.txt";
-				return mapload(polemap, mapchoice);
-			}
-			case 3:
-			{
-				mapchoice = "map3.txt";
-				return mapload(polemap, mapchoice);
-			}
-			default:
-				break;
+				if(std::strcmp(flag_buffer,"solid") == 0) {
+					tile_template.flag = Tile_Flag::Solid;
+				}
+				else if(std::strcmp(flag_buffer,"below") == 0) {
+					tile_template.flag = Tile_Flag::Below;
+				}
+				else if(std::strcmp(flag_buffer,"above") == 0) {
+					tile_template.flag = Tile_Flag::Above;
+				}
+				else if(std::strcmp(flag_buffer,"bulletpass") == 0) {
+					tile_template.flag = Tile_Flag::Bulletpass;
+				}
+				else throw File_Exception(Tiles_Info_File_Path,"Invalid format.");
+
+				tile_templates.push_back(tile_template);
 			}
 		}
-		else
-		{
-			switch (mapchoiceint)
+	}
 
-			{
-			case 1:
-			{
-				mapchoice = "savefile1.txt";
-				return mapload(polemap, mapchoice);
+	void Game::upadate_player(float delta_time) {
+		Vec2 forward = {};
+		if(platform->is_key_down(Keycode::Right) || platform->is_key_down(Keycode::D)) {
+			player_tank.dir = Entity_Direction::Right;
+			forward = {1.0f,0.0f};
+		}
+		if(platform->is_key_down(Keycode::Down) || platform->is_key_down(Keycode::S)) {
+			player_tank.dir = Entity_Direction::Down;
+			forward = {0.0f,1.0f};
+		}
+		if(platform->is_key_down(Keycode::Left) || platform->is_key_down(Keycode::A)) {
+			player_tank.dir = Entity_Direction::Left;
+			forward = {-1.0f,0.0f};
+		}
+		if(platform->is_key_down(Keycode::Up) || platform->is_key_down(Keycode::W)) {
+			player_tank.dir = Entity_Direction::Up;
+			forward = {0.0f,-1.0f};
+		}
+		if(platform->was_key_pressed(Keycode::Space)) {
+			Bullet bullet{};
+			bullet.fired_by_player = true;
+			bullet.dir = player_tank.dir;
+			bullet.position = player_tank.position + Player_Tank_Bullet_Firing_Positions[std::size_t(bullet.dir)];
+			bullets.push_back(bullet);
+		}
+
+		player_tank.position.x += forward.x * Tank_Speed * delta_time;
+		player_tank.position.y += forward.y * Tank_Speed * delta_time;
+		Rect player_tank_rect = {player_tank.position.x - Tank_Size.x / 2.0f,player_tank.position.y - Tank_Size.y / 2.0f,Tank_Size.x,Tank_Size.y};
+
+		Rect eagle_rect = {eagle.position.x - Eagle_Size.x / 2.0f,eagle.position.y - Eagle_Size.y / 2.0f,Eagle_Size.x,Eagle_Size.y};
+		if(!eagle.destroyed && player_tank_rect.overlaps(eagle_rect)) {
+			switch(player_tank.dir) {
+				case Entity_Direction::Right: { player_tank.position.x = eagle.position.x - 1.0f; break; }
+				case Entity_Direction::Down: { player_tank.position.y = eagle.position.y - 1.0f; break; }
+				case Entity_Direction::Left: { player_tank.position.x = eagle.position.x + 1.0f; break; }
+				case Entity_Direction::Up: { player_tank.position.y = eagle.position.y + 1.0f; break; }
 			}
-			case 2:
-			{
-				mapchoice = "savefile1.txt";
-				return mapload(polemap, mapchoice);
-			}
-			case 3:
-			{
-				mapchoice = "savefile1.txt";
-				return mapload(polemap, mapchoice);
-			}
-			default:
-				break;
-			}
+		}
+
+		const auto& relative_bounding_box = Rect{0,0,1,1};
+		Point upper_right = {
+			std::uint32_t(((player_tank.position.x - Tank_Size.x / 2.0f) + relative_bounding_box.x + relative_bounding_box.width) * 2.0f),
+			std::uint32_t(((player_tank.position.y - Tank_Size.y / 2.0f) + relative_bounding_box.y) * 2.0f)
 		};
-	};
-		
+		Point lower_right = {
+			std::uint32_t(((player_tank.position.x - Tank_Size.x / 2.0f) + relative_bounding_box.x + relative_bounding_box.width) * 2.0f),
+			std::uint32_t(((player_tank.position.y - Tank_Size.y / 2.0f) + relative_bounding_box.y + relative_bounding_box.height) * 2.0f)
+		};
+		Point upper_left = {
+			std::uint32_t(((player_tank.position.x - Tank_Size.x / 2.0f) + relative_bounding_box.x) * 2.0f),
+			std::uint32_t(((player_tank.position.y - Tank_Size.y / 2.0f) + relative_bounding_box.y) * 2.0f)
+		};
+		Point lower_left = {
+			std::uint32_t(((player_tank.position.x - Tank_Size.x / 2.0f) + relative_bounding_box.x) * 2.0f),
+			std::uint32_t(((player_tank.position.y - Tank_Size.y / 2.0f) + relative_bounding_box.y + relative_bounding_box.height) * 2.0f)
+		};
 
-	void Game::graphics(float delta_time) {
-		switch (scene) {
-		case Scene::Main_Menu:
-			for(float i = 0;i < Background_Tile_Count_X;i += 1) {
-				for(float j = 0;j < Background_Tile_Count_Y;j += 1) {
-					renderer->draw_sprite({0.5f + i,0.5f + j},{1.0f,1.0f},0.0f,tiles_sprite_atlas,4);
+		struct Point_Pair { Point a;Point b; };
+		Point_Pair pairs[] = {{upper_right,lower_right},{lower_right,lower_left},{upper_left,lower_left},{upper_left,upper_right}};
+		const Point_Pair& pair = pairs[std::size_t(player_tank.dir)];
+
+		Irect tile_screen_rect = {0.0f,0.0f,Background_Tile_Count_X * 2,Background_Tile_Count_Y * 2};
+		bool is_a_point = tile_screen_rect.point_inside(pair.a);
+		bool is_b_point = tile_screen_rect.point_inside(pair.b);
+		if(is_a_point || is_b_point) {
+			const auto& point = is_a_point ? pair.a : pair.b;
+			const auto& tile = tiles[point.y * (Background_Tile_Count_X * 2) + point.x];
+			if(tile.template_index != Invalid_Tile_Index) {
+				const auto& tile_template = tile_templates[tile.template_index];
+				if(tile_template.flag == Tile_Flag::Solid) {
+					switch(player_tank.dir) {
+						case Entity_Direction::Right: {
+							player_tank.position.x = point.x / 2.0f - Tank_Size.x / 2.0f;
+							break;
+						}
+						case Entity_Direction::Down: {
+							player_tank.position.y = point.y / 2.0f - Tank_Size.y / 2.0f;
+							break;
+						}
+					}
 				}
 			}
-			renderer->draw_text({1.0f,3.0f,1},{0.8f,1.0f},{1.0f,1.0f,1.0f},"Projekt na programowanie II");
-			// to replace;
-			
-			renderer->draw_text({ 2.0f,4.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices==2 ? 0 : 1) }, "1 player");
-			renderer->draw_text({ 2.0f,5.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == 1 ? 0 : 1) }, "2 player");
-			renderer->draw_text({ 2.0f,6.0f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice + 2) % number_of_choices == 0 ? 0 : 1) }, "Construction");
-			//	renderer->draw_text({ 2.0f,6.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice + 2) % number_of_choices == 0 ? 0 : 1) }, "Load Game");
-		//	renderer->draw_text({ 2.0f,7.5f,1 }, { 0.8f,1.0f }, { 1.0f,1.0f,(float)((menu_choice+2) % number_of_choices == -1 ? 0 : 1) }, "Construction");
-			break;
+		}
+	}
 
-		case Scene::Select_Level_1player:
-			for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y; j += 1) {
-					renderer->draw_sprite({ 0.5f + i,0.5f + j }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, 5);
+	void Game::update(float delta_time) {
+		if(platform->was_key_pressed(Keycode::F3)) {
+			show_fps = !show_fps;
+		}
+
+		switch(scene) {
+			case Scene::Main_Menu: {
+				if(platform->was_key_pressed(Keycode::Down)) {
+					current_main_menu_option += 1;
+					if(current_main_menu_option >= Main_Menu_Options_Count) current_main_menu_option = 0;
 				}
-			}
-
-			renderer->draw_text({ 1.0f,3.0f,1 }, { 1.0f,1.0f }, { 1.0f,1.0f,1.0f }, "The only one level 1");
-
-			renderer->draw_text({ 2.0f,5.0f,1 }, { 0.5f,0.5f }, { 1.0f,1.0f,1.0f }, "Press Enter to play that level");
-
-			break;
-
-//Game_1player
-		case Scene::Game_1player:
-			int a, b;
-			for (float i = 0; i < Background_Tile_Count_X*2; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y*2; j += 1) 
-				{
-					a = static_cast<int>(i);
-					b = static_cast<int>(j);
-					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, mapArray[a][b].sprite_layer_index);
+				if(platform->was_key_pressed(Keycode::Up)) {
+					if(current_main_menu_option == 0) current_main_menu_option = Main_Menu_Options_Count;
+					current_main_menu_option -= 1;
 				}
+				if(platform->was_key_pressed(Keycode::Return)) {
+					switch(current_main_menu_option) {
+						case 0: {
+							scene = Scene::Intro_1player;
+							break;
+						}
+						case 1: {
+							platform->error_message_box("Local multiplayer is not yet supported.");
+							break;
+						}
+						case 2: {
+							platform->error_message_box("Level selection is not yet supported.");
+							break;
+						}
+						case 3: {
+							for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
+								for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
+									tiles[y * (Background_Tile_Count_X * 2) + x] = Tile{Invalid_Tile_Index};
+								}
+							}
+							eagle.destroyed = false;
+							eagle.position = {Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f};
+							player_tank.destroyed = false;
+							player_tank.dir = Entity_Direction::Up;
+							player_tank.position = eagle.position - Vec2{3.0f,0.0f};
+							bullets.clear();
+							scene = Scene::Construction;
+							break;
+						}
+						case 4: {
+							quit = true;
+							break;
+						}
+					}
+				}
+				break;
 			}
-			tank.animate(delta_time);
-			renderer->draw_sprite(tank.position, tank.size, (float)tank.rotation, player1_alias, 0);
+			case Scene::Intro_1player: {
+				update_timer += delta_time;
+				static constexpr float Intro_Screen_Duration = 0.0f;
+				if(update_timer >= Intro_Screen_Duration) {
+					update_timer = 0.0f;
+					
+					for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
+						for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
+							tiles[y * (Background_Tile_Count_X * 2) + x] = Tile{Invalid_Tile_Index};
+						}
+					}
+					tiles[0 * (Background_Tile_Count_X * 2) + 0] = Tile{11};
+					tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + 0] = Tile{14};
+					tiles[0 * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{12};
+					tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{13};
 
-			for (auto& bullet : List_Of_Bullets) {
-				bullet.animate(delta_time);
-				bullet.render(renderer, bullet_alias);
+					for(std::uint32_t x = 1;x < Background_Tile_Count_X * 2 - 1;x += 1) {
+						tiles[0 * (Background_Tile_Count_X * 2) + x] = Tile{8};
+						tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + x] = Tile{10};
+					}
+					for(std::uint32_t y = 1;y < Background_Tile_Count_Y * 2 - 2;y += 1) {
+						tiles[y * (Background_Tile_Count_X * 2) + 0] = Tile{7};
+						tiles[y * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{9};
+					}
 
-				for (auto& barrel : List_Of_Barrels) {
-					if (collision(barrel.position, barrel.hitbox_radius, bullet.position, bullet.hitbox_radius)) {
-						printf("Explosion\n");
-						List_Of_Bullets.remove(bullet);
-						List_Of_Barrels.remove(barrel);
-						break;
+					tiles[6 * (Background_Tile_Count_X * 2) + 8] = Tile{0};
+
+					eagle.destroyed = false;
+					eagle.position = {Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f};
+					player_tank.destroyed = false;
+					player_tank.dir = Entity_Direction::Up;
+					player_tank.position = eagle.position - Vec2{3.0f,0.0f};
+					player_lifes = 3;
+					bullets.clear();
+
+					scene = Scene::Game_1player;
+				}
+				break;
+			}
+			case Scene::Game_1player: {
+				upadate_player(delta_time);
+
+				Rect screen_rect = {0.0f,0.0f,float(Background_Tile_Count_X),float(Background_Tile_Count_Y)};
+				Irect tile_screen_rect = {0.0f,0.0f,Background_Tile_Count_X * 2,Background_Tile_Count_Y * 2};
+				for(auto& bullet : bullets) {
+					bullet.position += core::entity_direction_to_vector(bullet.dir) * Bullet_Speed * delta_time;
+
+					const auto& relative_bullet_rect = Bullet_Bounding_Boxes[std::size_t(bullet.dir)];
+					Rect bullet_rect = {
+						bullet.position.x - Bullet_Size.x / 2.0f + relative_bullet_rect.x,
+						bullet.position.y - Bullet_Size.y / 2.0f + relative_bullet_rect.y,
+						relative_bullet_rect.width,
+						relative_bullet_rect.height
 					};
-				}
-				for (auto& enemy : List_Of_Enemy_Tanks) {
-					if (collision(enemy.position, enemy.hitbox, bullet.position, bullet.hitbox_radius)) {
-						printf("Explosion\n");
-						List_Of_Bullets.remove(bullet);
-						List_Of_Enemy_Tanks.remove(enemy);
-						break;
-					}						
-				}
+					if(!screen_rect.overlaps(bullet_rect)) bullet.destroyed = true;
 
-				if (!on_screen(bullet.position, bullet.size)) {
-					List_Of_Bullets.remove(bullet);
-					break;
-				}
-			}
-			for (auto& enemy : List_Of_Enemy_Tanks) {
-				if (collision(tank.position, tank.hitbox, enemy.position, enemy.hitbox)) {
-					tank.destroyed();
-					enemy.durability--;
-					if (enemy.durability < 1) {
-						List_Of_Enemy_Tanks.remove(enemy);
-						break;
+					Rect eagle_rect = {eagle.position.x - Eagle_Size.x / 2.0f,eagle.position.y - Eagle_Size.y / 2.0f,Eagle_Size.x,Eagle_Size.y};
+					if(!eagle.destroyed && bullet_rect.overlaps(eagle_rect)) {
+						eagle.destroyed = true;
+						bullet.destroyed = true;
+						static constexpr float Time_To_Lose = 1.0f;
+						game_lose_timer = Time_To_Lose;
+						continue;
+					}
+
+					const auto& relative_bounding_box = Bullet_Bounding_Boxes[std::size_t(bullet.dir)];
+					Point upper_right = {
+						std::uint32_t(((bullet.position.x - Bullet_Size.x / 2.0f) + relative_bounding_box.x + relative_bounding_box.width) * 2.0f),
+						std::uint32_t(((bullet.position.y - Bullet_Size.y / 2.0f) + relative_bounding_box.y) * 2.0f)
+					};
+					Point lower_right = {
+						std::uint32_t(((bullet.position.x - Bullet_Size.x / 2.0f) + relative_bounding_box.x + relative_bounding_box.width) * 2.0f),
+						std::uint32_t(((bullet.position.y - Bullet_Size.y / 2.0f) + relative_bounding_box.y + relative_bounding_box.height) * 2.0f)
+					};
+					Point upper_left = {
+						std::uint32_t(((bullet.position.x - Bullet_Size.x / 2.0f) + relative_bounding_box.x) * 2.0f),
+						std::uint32_t(((bullet.position.y - Bullet_Size.y / 2.0f) + relative_bounding_box.y) * 2.0f)
+					};
+					Point lower_left = {
+						std::uint32_t(((bullet.position.x - Bullet_Size.x / 2.0f) + relative_bounding_box.x) * 2.0f),
+						std::uint32_t(((bullet.position.y - Bullet_Size.y / 2.0f) + relative_bounding_box.y + relative_bounding_box.height) * 2.0f)
+					};
+
+					struct Point_Pair { Point a;Point b; };
+					Point_Pair pairs[] = {{upper_right,lower_right},{lower_right,lower_left},{upper_left,lower_left},{upper_left,upper_right}};
+					const Point_Pair& pair = pairs[std::size_t(bullet.dir)];
+					
+					bool is_a_point = tile_screen_rect.point_inside_inclusive(pair.a);
+					bool is_b_point = tile_screen_rect.point_inside_inclusive(pair.b);
+					if(is_a_point || is_b_point) {
+						const auto& point = is_a_point ? pair.a : pair.b;
+						const auto& tile = tiles[point.y * (Background_Tile_Count_X * 2) + point.x];
+						if(tile.template_index != Invalid_Tile_Index) {
+							const auto& tile_template = tile_templates[tile.template_index];
+							if(tile_template.flag == Tile_Flag::Solid) bullet.destroyed = true;
+						}
 					}
 				}
-				renderer->draw_sprite(enemy.position, enemy.size, enemy.rotation, tiles_sprite_atlas, enemy.sprite_index);
+				std::erase_if(bullets,[](const Bullet& bullet) { return bullet.destroyed; });
+
+				if(eagle.destroyed) {
+					game_lose_timer -= delta_time;
+					if(game_lose_timer <= 0.0f) {
+						game_lose_timer = 0.0f;
+						scene = Scene::Game_Over;
+					}
+				}
+				break;
 			}
-			for (auto& barrel : List_Of_Barrels) {
-				renderer->draw_sprite(barrel.position, barrel.size, 0, tiles_sprite_atlas, barrel.sprite_index);
+			case Scene::Construction: {
+				auto mouse_pos = platform->mouse_position();
+				auto dims = renderer->render_client_rect_dimensions();
+				float tile_width = float(dims.width) / float(Background_Tile_Count_X * 2);
+				float tile_height = float(dims.height) / float(Background_Tile_Count_Y * 2);
+
+				if(!construction_choosing_tile) {
+					if(dims.point_inside(mouse_pos)) {
+						construction_marker_pos.x = std::uint32_t(float(mouse_pos.x - dims.x) / tile_width);
+						construction_marker_pos.y = std::uint32_t(float(mouse_pos.y - dims.y) / tile_height);
+
+						if(platform->was_key_pressed(Keycode::Mouse_Left)) {
+							if(construction_current_tile_template_index != Invalid_Tile_Index) {
+								Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
+								tile.template_index = construction_current_tile_template_index;
+								tile.health = tile_templates[tile.template_index].health;
+							}
+						}
+						if(platform->was_key_pressed(Keycode::Mouse_Right)) {
+							Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
+							tile.template_index = Invalid_Tile_Index;
+						}
+						if(platform->was_key_pressed(Keycode::Mouse_Middle)) {
+							Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
+							construction_current_tile_template_index = tile.template_index;
+						}
+						if(platform->was_key_pressed(Keycode::E)) construction_choosing_tile = true;
+						if(platform->was_key_pressed(Keycode::Escape)) scene = Scene::Main_Menu;
+					}
+				}
+				else {
+					tile_width = float(dims.width) / float(Background_Tile_Count_X);
+					tile_height = float(dims.height) / float(Background_Tile_Count_Y);
+
+					Vec2 offset = {};
+					for(std::size_t i = 0;i < tile_templates.size();i += 1) {
+						const Tile_Template& elem = tile_templates[i];
+
+						Irect rect = {
+							std::uint32_t((1.0f + offset.x) * tile_width + dims.x),
+							std::uint32_t((1.0f + offset.y) * tile_height + dims.y),
+							tile_width,
+							tile_height
+						};
+
+						if(platform->was_key_pressed(Keycode::Mouse_Left) && rect.point_inside(mouse_pos)) {
+							construction_current_tile_template_index = i;
+							construction_choosing_tile = false;
+						}
+						offset.x += 1.0f;
+						if(offset.x > float(Background_Tile_Count_X) - 3.0f) {
+							offset.x = 0.0f;
+							offset.y += 1.0f;
+						}
+					}
+					if(platform->was_key_pressed(Keycode::Escape) || platform->was_key_pressed(Keycode::E)) construction_choosing_tile = false;
+				}
+				break;
 			}
-			break;
-		case Scene::Select_Level_2player:
-			while (true)
-			{
-				for (float i = 0; i < Background_Tile_Count_X; i += 1) {
-					for (float j = 0; j < Background_Tile_Count_Y; j += 1) {
-						renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, 1);
+			case Scene::Level_Selection: {
+				break;
+			}
+			case Scene::Game_Over: {
+				if(platform->was_key_pressed(Keycode::Return)) scene = Scene::Main_Menu;
+				break;
+			}
+		}
+	}
+
+	void Game::render(float delta_time) {
+		if(show_fps) {
+			char buffer[64] = {};
+			std::snprintf(buffer,sizeof(buffer) - 1,"FPS: %f",1.0f / delta_time);
+			renderer->draw_text({0.125f,0.125f,1},{0.25f,0.25f},{1,1,1},buffer);
+		}
+		switch(scene) {
+			case Scene::Main_Menu: {
+				for(std::size_t i = 0;i < Main_Menu_Options_Count;i += 1) {
+					auto rect = renderer->compute_text_dims({0,0,1},{0.25f,0.25f},Main_Menu_Options[i]);
+					Vec3 color = (current_main_menu_option == i) ? Vec3{1,1,0} : Vec3{1,1,1};
+					renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Main_Menu_First_Option_Y_Offset + float(i) * 0.5f,1},{0.25f,0.25f},color,Main_Menu_Options[i]);
+				}
+				break;
+			}
+			case Scene::Intro_1player: {
+				break;
+			}
+			case Scene::Game_1player: {
+				for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
+					for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
+						const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+						if(tile.template_index == Invalid_Tile_Index) continue;
+						const auto& tile_template = tile_templates[tile.template_index];
+
+						float z_order = 0.0f;
+						switch(tile_template.flag) {
+							case Tile_Flag::Above: z_order = 0.75f; break;
+							case Tile_Flag::Bulletpass:
+							case Tile_Flag::Below: z_order = 0.25f; break;
+						}
+						renderer->draw_sprite({0.25f + x * 0.5f,0.25f + y * 0.5f,z_order},{0.5f,0.5f},tile_template.rotation,tiles_texture,tile_template.tile_layer_index);
 					}
 				}
 
-			}
-
-			break;
-		case Scene::Game_2player:
-			break;
-		case Scene::Construction:
-		{
-			int c, d;
-			//drawing texture number 1;
-			for (float i = 0; i < Background_Tile_Count_X*2; i += 1) {
-				for (float j = 0; j < Background_Tile_Count_Y*2; j += 1)
-				{
-					c = static_cast<int>(i);
-					d = static_cast<int>(j);
-					renderer->draw_sprite({ 0.5f + i,0.5f + j,0 }, { 1.0f,1.0f }, 0.0f, tiles_sprite_atlas, mapArray[c][d].sprite_layer_index);
+				for(const auto& bullet : bullets) {
+					renderer->draw_sprite({bullet.position.x,bullet.position.y},{1.0f,1.0f},core::entity_direction_to_rotation(bullet.dir),entity_sprites,Bullet_Sprite_Layer_Index);
 				}
+
+				if(!eagle.destroyed) {
+					renderer->draw_sprite({eagle.position.x,eagle.position.y,0.5f},Eagle_Size,0.0f,entity_sprites,Eagle_Sprite_Layer_Index);
+				}
+				if(!player_tank.destroyed) {
+					renderer->draw_sprite({player_tank.position.x,player_tank.position.y,0.5f},Tank_Size,core::entity_direction_to_rotation(player_tank.dir),entity_sprites,Player_Tank_Sprite_Layer_Index);
+				}
+
+				renderer->draw_sprite({0.25f,Background_Tile_Count_Y - 0.25f,1.0f},{0.5f,0.5f},0,entity_sprites,Player_Tank_Sprite_Layer_Index);
+				char lifes_buffer[32] = {};
+				int count = std::snprintf(lifes_buffer,sizeof(lifes_buffer) - 1,"x%" PRIu32,player_lifes);
+				if(count > 0) renderer->draw_text({0.75f,Background_Tile_Count_Y - 0.25f,1.0f},{0.5f,0.5f},{1,1,1},lifes_buffer);
+				break;
+			}
+			case Scene::Construction: {
+				if(!construction_choosing_tile) {
+					for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
+						for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
+							const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+							if(tile.template_index == Invalid_Tile_Index) continue;
+							const auto& tile_template = tile_templates[tile.template_index];
+
+							float z_order = 0.0f;
+							switch(tile_template.flag) {
+								case Tile_Flag::Above: z_order = 0.75f; break;
+								case Tile_Flag::Bulletpass:
+								case Tile_Flag::Below: z_order = 0.25f; break;
+							}
+							renderer->draw_sprite({0.25f + x * 0.5f,0.25f + y * 0.5f,z_order},{0.5f,0.5f},tile_template.rotation,tiles_texture,tile_template.tile_layer_index);
+						}
+					}
+
+					renderer->draw_sprite({eagle.position.x,eagle.position.y,0.5f},Eagle_Size,0.0f,entity_sprites,Eagle_Sprite_Layer_Index);
+					renderer->draw_sprite({player_tank.position.x,player_tank.position.y,0.5f},Tank_Size,0.0f,entity_sprites,Player_Tank_Sprite_Layer_Index);
+					renderer->draw_sprite({float(construction_marker_pos.x) * 0.5f + 0.25f,float(construction_marker_pos.y) * 0.5f + 0.25f,1.0f},{0.5f,0.5f},0,construction_place_marker);
+				}
+				else {
+					Vec2 offset = {};
+					Vec2 marker_offset = {};
+					for(std::size_t i = 0;i < tile_templates.size();i += 1) {
+						const Tile_Template& elem = tile_templates[i];
+						renderer->draw_sprite({1.5f + offset.x,1.5f + offset.y},{1.0f,1.0f},elem.rotation,tiles_texture,elem.tile_layer_index);
+						if(construction_current_tile_template_index == i) marker_offset = offset;
+
+						offset.x += 1.0f;
+						if(offset.x > float(Background_Tile_Count_X) - 3.0f) {
+							offset.x = 0.0f;
+							offset.y += 1.0f;
+						}
+					}
+					renderer->draw_sprite({1.5f + marker_offset.x,1.5f + marker_offset.y},{1.0f,1.0f},0,construction_place_marker,0);
+					renderer->draw_text({0.125f,0.125f,1},{0.25f,0.25f},{1,1,1},"Choose a tile from the list below (or press 'Escape' or 'E' to cancel).");
+				}
+				break;
+			}
+			case Scene::Level_Selection: {
+				break;
+			}
+			case Scene::Game_Over: {
+				auto rect = renderer->compute_text_dims({},{0.5f,0.5f},"You lost!");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,3.0f},{0.5f,0.5f},{1,1,1},"You lost!");
+
+				rect = renderer->compute_text_dims({},{0.5f,0.5f},"The eagle has been destroyed.");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},"The eagle has been destroyed.");
+
+				rect = renderer->compute_text_dims({},{0.5f,0.5f},"Press 'Enter' to return to the main menu.");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.5f,0.5f},{1,1,1},"Press 'Enter' to return to the main menu.");
+				break;
 			}
 		}
-			//drawing tank
-			tank.go(delta_time);
-			renderer->draw_sprite(tank.position, tank.size, (float)tank.rotation, tiles_sprite_atlas, tank.sprite_index);
-
-			break;
-			/*
-		case Scene::Load_game:
-			{
-			renderer->draw_text({ 1.0f,3.0f,1 }, { 1.0f,1.0f }, { 1.0f,1.0f,1.0f }, "Choose save file");
-			break;
-			}
-			*/
-		default:
-			break;
-		}
 	}
 
-	void Game::logic() {
-		switch (scene) {
-		case Scene::Main_Menu:
-			if (platform->was_key_pressed(core::Keycode::Down)) {
-				menu_choice--;
-				//printf("menu choice: %d\n", menu_choice);
-				if (menu_choice < 1) {
-					menu_choice += 3;
-				}
-			}
-			if (platform->was_key_pressed(core::Keycode::Up)) {
-				menu_choice++;
-				if (menu_choice > 4) {
-					menu_choice -= 3;
-				}
-				//printf("menu choice: %d\n", menu_choice);
-			}
-			if (platform->was_key_pressed(core::Keycode::Return)) {
-				//printf("Execute choice: %d\n", menu_choice);
-				if (menu_choice == 3 || menu_choice == 0) {
-					scene = Scene::Select_Level_1player;
-				}
-				if (menu_choice == 2) {
-					scene = Scene::Select_Level_2player;
-				}
-				if (menu_choice == 1 || menu_choice == 4) {
-					scene = Scene::Construction;
-				}
-			}
-			
-			break;
-		case Scene::Select_Level_1player:
-			if (platform->was_key_pressed(core::Keycode::Return)) {
-				//Game_1player();
-				scene = Scene::Game_1player;
-			}
-			break;
-		case Scene::Game_1player:
-			//control
-			if (platform->is_key_down(core::Keycode::Up)) {
-				tank.move(PI);
-			}
-			if (platform->is_key_down(core::Keycode::Down)) {
-				tank.move(0);
-			}
-			if (platform->is_key_down(core::Keycode::Right)) {
-				tank.move(PI/2);
-			}
-			if (platform->is_key_down(core::Keycode::Left)) {
-				tank.move(3*PI/2);
-			}
-			//shooting
-			if (platform->was_key_pressed(core::Keycode::A) || platform->was_key_pressed(core::Keycode::Space)) {
-				List_Of_Bullets.push_front({ 0, tank.direction, tank.position });
-				}
-
-		//debuging 
-			
-			if (platform->was_key_pressed(core::Keycode::A)) {
-				printf("TANK X Y Z: %f %f %f\n", tank.position.x, tank.position.y, tank.position.z);
-			}
-			
-			if (platform->was_key_pressed(core::Keycode::B)) {
-				
-				List_Of_Barrels.push_front({ 18,{5.5f,5.5f,0.2f},{1.0f,1.0f} });
-				printf("Added Barrel\n");
-			}
-
-			if (platform->was_key_pressed(core::Keycode::T)) 
-			{
-				SaveMenu(mapArray, tank);
-				printf("saving \n");
-			}
-			if (platform->was_key_pressed(core::Keycode::Y))
-			{
-				mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2] = loadmenu(mapArray, 1);
-				printf("loading, \n ");
-
-			}
-			if (platform->was_key_pressed(core::Keycode::C)) {
-				List_Of_Enemy_Tanks.push_back({ 3,{2.5f,2.5f,0} });
- 
-			}
-			
-
-			break;
-		case Scene::Select_Level_2player:
-			if (platform->was_key_pressed(core::Keycode::Return))
-				scene = Scene::Game_1player;
-			break;
-		case Scene::Game_2player:
-			break;
-		case Scene::Construction:
-			//control
-			if (platform->was_key_pressed(core::Keycode::Up)) {
-				tank.move_one(PI);
-			}
-			if (platform->was_key_pressed(core::Keycode::Down)) {
-				tank.move_one(0);
-			}
-			if (platform->was_key_pressed(core::Keycode::Right)) {
-				tank.move_one(PI/2);
-			}
-			if (platform->was_key_pressed(core::Keycode::Left)) {
-				tank.move_one(3*PI/2);
-			}
-
-			if (platform->was_key_pressed(core::Keycode::A) || platform->was_key_pressed(core::Keycode::Space)) {
-				//do sth
-			}
-			break;
-		default:
-		{
-			printf("BAD SCENE\n");
-			break;
-		}
-		}
-		
+	bool Game::quit_requested() const noexcept {
+		return quit;
 	}
-
-	bool Game::fully_on_screen(Vec3 position, Vec2 size)
-	{
-		if (position.x-size.x/2 > 0 && position.y-size.y/2 > 0 && position.x + size.x / 2 <Background_Tile_Count_X && position.y + size.y / 2 < Background_Tile_Count_Y) return true;
-
-		return false;
-	}
-	bool Game::on_screen(Vec3 position, Vec2 size)
-	{
-		if (position.x + size.x / 2 > 0 && position.y + size.y / 2 > 0 && position.x - size.x / 2 < Background_Tile_Count_X && position.y - size.y / 2 < Background_Tile_Count_Y) return true;
-
-		return false;
-	}
-	bool Game::collision(Vec3 position1, Vec2 size1, Vec3 position2, Vec2 size2) {
-		return(position1.x + size1.x / 2 > position2.x - size2.x/2 && position1.y + size1.y / 2 > position2.y - size2.y / 2 &&
-			position1.x - size1.x / 2 < position2.x + size2.x / 2 && position1.y - size1.y / 2 < position2.y + size2.y / 2
-			);
-	}
-	bool Game::collision(Vec3 position1, Vec2 size1, Vec3 circle_position, float radius) {
-		float distance_between = sqrt((circle_position.x - position1.x) * (circle_position.x - position1.x) + (circle_position.y - position1.y) * (circle_position.y - position1.y));
-		//float x = size1.x / 2 * (circle_position.x - position1.x)/distance_between;
-		//float y = size1.y / 2 * (circle_position.y - position1.y) / distance_between;
-		//printf("distacnce %f = radius %f  x:%f y:%f\n", distance_between, radius, x, y);
-		return distance_between < radius+ abs(size1.x / 2 * (circle_position.x - position1.x) / distance_between) + abs(size1.y / 2 * (circle_position.y - position1.y) / distance_between);
-	}
-	bool Game::collision(Vec3 circle_position1, float radius1, Vec3 circle_position2, float radius2) {
-		return radius1+radius2> sqrt((circle_position2.x - circle_position1.x) * (circle_position2.x - circle_position1.x) + (circle_position2.y - circle_position1.y) * (circle_position2.y - circle_position1.y));
-	}
-
-
-	void Game::Tank::move(float direction)
-	{
-		this->direction = direction;
-		distance_to_travel = 0.01f;
-		
-	}
-	void Game::Tank::move_one(float direction)
-	{
-		this->direction = direction;
-		distance_to_travel = 0.5f;
-	}
-	void Game::Tank::animate(float delta_time)
-	{
-		if (distance_to_travel >= 0) {
-			const float scale = PI;
-			this->distance_to_travel -= delta_time;
-			this->rotation = (float)direction;
-
-			if (direction == 0) { this->rotation = PI; }
-			else {
-				if (direction == PI) this->rotation = 0;
-			}
-
-			//be inside of window
-			Vec3 next_position;
-			next_position= { this->position.x + scale * delta_time * std::sin(direction), this->position.y + scale * delta_time * std::cos(direction),this->position.z };
-			if (next_position.x - size.x / 2 > 0 && next_position.y - size.y / 2 > 0 && next_position.x + size.x / 2 < Background_Tile_Count_X && next_position.y + size.y / 2 < Background_Tile_Count_Y
-				
-				) {
-				this->position = next_position;
-			}
-
-		}
-
-	}
-	void Game::Tank::go(float delta_time)
-	{
-		float scale = 1;
-		if(distance_to_travel>0){
-			Vec3 next_position;
-			next_position = { this->position.x + scale * std::sin(direction), this->position.y + scale  * std::cos(direction),this->position.z };
-			if (next_position.x> 0 && next_position.y > 0 && next_position.x < Background_Tile_Count_X && next_position.y < Background_Tile_Count_Y				
-				) {
-				this->position = next_position;
-			}
-		
-		this->rotation = (float)direction;
-		this->distance_to_travel=0;
-		}
-	}
-	void Game::Tank::destroyed() {
-		printf("The tank is destroyed make it happend\n");
-	}
-
-	
 }

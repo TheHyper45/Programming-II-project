@@ -3,18 +3,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "math.hpp"
 
 namespace core {
-	struct Dimensions {
-		std::uint32_t width;
-		std::uint32_t height;
-	};
-
-	struct Point {
-		std::uint32_t x;
-		std::uint32_t y;
-	};
-
 	//Since C++ still doesn't have reflection, this trick lets us implement 'keycode_to_string' function without having to manually write all of the keycode names.
 #define CORE_KEYCODES(MACRO)\
 	MACRO(Unknown)\

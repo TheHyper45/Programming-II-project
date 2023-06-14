@@ -44,8 +44,6 @@ add_executable(tanks
     code/math.cpp
     code/game.hpp
     code/game.cpp
-    code/bullets.cpp
-    code/bullets.cpp
     ${PLATFORM_FILES}
     ${RESOURCE_FILE}
 )

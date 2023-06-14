@@ -4,10 +4,10 @@
 #include <chrono>
 #include <iostream>
 #include <exception>
+#include "game.hpp"
 #include "platform.hpp"
 #include "renderer.hpp"
 #include "exceptions.hpp"
-#include "game.hpp"
 
 int main() {
     core::Platform platform = {};
@@ -16,19 +16,19 @@ int main() {
         
         auto renderer = platform.create_renderer();
 
-        core::Game game(&renderer, &platform);
-        game.menu();
+        core::Game game{&renderer,&platform};
+
         auto start_time = std::chrono::steady_clock::now();
-        while(!platform.window_closed()) {
+        while(!platform.window_closed() && !game.quit_requested()) {
             auto end_time = std::chrono::steady_clock::now();
             float delta_time = float(std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count()) / 1000000.0f;
             start_time = end_time;
             
             platform.process_events();
-            game.logic();
+            game.update(delta_time);
             
             renderer.begin(delta_time);
-            game.graphics(delta_time);
+            game.render(delta_time);
             renderer.end();
             platform.swap_window_buffers();
         }
@@ -76,5 +76,4 @@ int main() {
         platform.error_message_box("Unknown exception type. Sorry for screwing up :(.");
         return 1;
     }
-
 }

@@ -63,7 +63,7 @@ namespace core {
 			return Keycode::Num_Keycodes;
 		if(vk_code >= 0xE9 && vk_code <= 0xF5)
 		   return Keycode::Num_Keycodes;
-
+		
 		switch(vk_code) {
 			case VK_UP: return Keycode::Up;
 			case VK_DOWN: return Keycode::Down;
