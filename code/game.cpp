@@ -26,6 +26,9 @@ namespace core {
 	static constexpr Vec2 Eagle_Size = {1.0f,1.0f};
 	static constexpr Vec2 Tank_Size = {1.0f,1.0f};
 	static constexpr Vec2 Bullet_Size = {1.0f,1.0f};
+	static constexpr Vec2 Enemy_Spawner_Locaions[] = {{2,2},{Background_Tile_Count_X / 2,2},{Background_Tile_Count_X - 2},2};
+	static constexpr std::uint32_t Spawn_Effect_Layer_Count = 7;
+	static constexpr float Spawn_Effect_Frame_Duration = 0.1f;
 
 	//static constexpr Rect Player_Tank_Bounding_Boxes[] = {{0.03125f,0.0625f,0.84375f,0.875f},{0.0625f,0.03125f,0.875f,0.84375f},{0.125f,0.0625f,0.84375f,0.875f},{0.0625f,0.125f,0.875f,0.84375f}};
 	//static constexpr Rect Enemy_Tank_Bounding_Boxes[] = {{0.03125f,0.0625f,0.84375f,0.875f},{0.0625f,0.03125f,0.875f,0.84375f},{0.125f,0.0625f,0.84375f,0.875f},{0.0625f,0.125f,0.875f,0.84375f}};
@@ -37,10 +40,11 @@ namespace core {
 
 	Game::Game(Renderer* _renderer,Platform* _platform) : renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),
 		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
-		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),eagle(),game_lose_timer() {
+		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),eagle(),game_lose_timer(),spawn_effects() {
 		tiles_texture = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
 		construction_place_marker = renderer->sprite("./assets/marker.bmp");
 		entity_sprites = renderer->sprite_atlas("./assets/entities_32x32.bmp",32);
+		spawn_effect_sprite_atlas = renderer->sprite_atlas("./assets/spawn_effect_32x32.bmp",32);
 
 		{
 			static constexpr const char* Tiles_Info_File_Path = "./assets/tiles_16x16.txt";
@@ -223,6 +227,8 @@ namespace core {
 							player_tank.dir = Entity_Direction::Up;
 							player_tank.position = eagle.position - Vec2{3.0f,0.0f};
 							bullets.clear();
+							enemy_tanks.clear();
+							spawn_effects.clear();
 							scene = Scene::Construction;
 							break;
 						}
@@ -269,6 +275,8 @@ namespace core {
 					player_tank.position = eagle.position - Vec2{3.0f,0.0f};
 					player_lifes = 3;
 					bullets.clear();
+					enemy_tanks.clear();
+					spawn_effects.clear();
 
 					scene = Scene::Game_1player;
 				}
@@ -370,6 +378,16 @@ namespace core {
 					}
 				}
 				std::erase_if(bullets,[](const Bullet& bullet) { return bullet.destroyed; });
+
+				for(auto& effect : spawn_effects) {
+					if(effect.current_frame >= Spawn_Effect_Layer_Count) continue;
+					effect.timer -= delta_time;
+					if(effect.timer <= 0.0f) {
+						effect.timer = Spawn_Effect_Frame_Duration;
+						effect.current_frame += 1;
+					}
+				}
+				std::erase_if(spawn_effects,[](const Spawn_Effect& effect) { return effect.current_frame >= Spawn_Effect_Layer_Count; });
 
 				if(eagle.destroyed) {
 					game_lose_timer -= delta_time;
@@ -494,6 +512,10 @@ namespace core {
 					renderer->draw_sprite({player_tank.position.x,player_tank.position.y,0.5f},Tank_Size,core::entity_direction_to_rotation(player_tank.dir),entity_sprites,Player_Tank_Sprite_Layer_Index);
 				}
 
+				for(const auto& effect : spawn_effects) {
+					renderer->draw_sprite({effect.position.x,effect.position.y,0.9f},{1,1},0,spawn_effect_sprite_atlas,effect.current_frame);
+				}
+
 				renderer->draw_sprite({0.25f,Background_Tile_Count_Y - 0.25f,1.0f},{0.5f,0.5f},0,entity_sprites,Player_Tank_Sprite_Layer_Index);
 				char lifes_buffer[32] = {};
 				int count = std::snprintf(lifes_buffer,sizeof(lifes_buffer) - 1,"x%" PRIu32,player_lifes);
@@ -560,5 +582,12 @@ namespace core {
 
 	bool Game::quit_requested() const noexcept {
 		return quit;
+	}
+
+	void Game::add_spawn_effect(Vec2 position) {
+		Spawn_Effect effect{};
+		effect.position = position;
+		effect.timer = Spawn_Effect_Frame_Duration;
+		spawn_effects.push_back(effect);
 	}
 }

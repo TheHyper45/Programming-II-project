@@ -73,6 +73,11 @@ namespace core {
 		Vec2 position;
 		bool destroyed;
 	};
+	struct Spawn_Effect {
+		Vec2 position;
+		std::uint32_t current_frame;
+		float timer;
+	};
 
 	class Game {
 	public:
@@ -85,6 +90,7 @@ namespace core {
 		[[nodiscard]] bool quit_requested() const noexcept;
 	private:
 		void update_player(float delta_time);
+		void add_spawn_effect(Vec2 position);
 		static inline constexpr std::uint32_t Invalid_Tile_Index = std::uint32_t(-1);
 
 		Renderer* renderer;
@@ -95,6 +101,7 @@ namespace core {
 		Sprite_Index tiles_texture;
 		Sprite_Index construction_place_marker;
 		Sprite_Index entity_sprites;
+		Sprite_Index spawn_effect_sprite_atlas;
 		Point construction_marker_pos;
 		bool construction_choosing_tile;
 		Point construction_tile_choice_marker_pos;
@@ -109,6 +116,7 @@ namespace core {
 		std::vector<Bullet> bullets;
 		std::vector<Tank> enemy_tanks;
 		float game_lose_timer;
+		std::vector<Spawn_Effect> spawn_effects;
 	};
 }
 #endif
