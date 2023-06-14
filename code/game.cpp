@@ -26,6 +26,7 @@ namespace core {
 	static constexpr std::uint32_t Spawn_Effect_Layer_Count = 7;
 	static constexpr float Spawn_Effect_Frame_Duration = 0.1f;
 	static constexpr float Tank_Shoot_Cooldown = 0.4f;
+	static constexpr float Enemy_Spawn_Time = 2.0f;
 
 	//Bounding boxes for each 'Entity_Direction' value in order.
 	static constexpr Rect Bullet_Bounding_Boxes[] = {{0.28125f,0.4375f,0.40625f,0.1875f},{0.4375f,0.28125f,0.1875f,0.40625f},{0.3125f,0.40625f,0.40625f,0.1875f},{0.4375f,0.3125f,0.1875f,0.40625f}};
@@ -36,7 +37,11 @@ namespace core {
 	Game::Game(Renderer* _renderer,Platform* _platform) : renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),
 		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
 		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),
-		eagle(),game_lose_timer(),spawn_effects(),enemy_tanks(),player_respawn_timer() {
+		eagle(),game_lose_timer(),spawn_effects(),enemy_tanks(),player_respawn_timer(),random_engine(),enamy_spawn_point_random_dist(),
+		max_enemy_count_on_screen(),remaining_enemy_count_to_spawn(),enemy_spawn_timer(),game_win_timer(),current_stage_index() {
+		random_engine = std::mt19937_64(std::time(nullptr));
+		enamy_spawn_point_random_dist = std::uniform_int_distribution<std::size_t>(0,Enemy_Spawner_Location_Count - 1);
+
 		tiles_texture = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
 		construction_place_marker = renderer->sprite("./assets/marker.bmp");
 		entity_sprites = renderer->sprite_atlas("./assets/entities_32x32.bmp",32);
@@ -140,12 +145,6 @@ namespace core {
 			bullets.push_back(bullet);
 			player_shoot_cooldown = Tank_Shoot_Cooldown;
 		}
-		if(platform->was_key_pressed(Keycode::Return)) {
-			Tank tank{};
-			tank.dir = Entity_Direction::Up;
-			tank.position = {float(Background_Tile_Count_X) / 2.0f,float(Background_Tile_Count_Y) / 2.0f};
-			enemy_tanks.push_back(tank);
-		}
 
 		player_tank.position.x += forward.x * Tank_Speed * delta_time;
 		player_tank.position.y += forward.y * Tank_Speed * delta_time;
@@ -205,6 +204,38 @@ namespace core {
 		}
 	}
 
+	void Game::update_enemies(float delta_time) {
+		if(remaining_enemy_count_to_spawn == 0 && enemy_tanks.size() == 0) {
+			game_win_timer -= delta_time;
+			if(game_win_timer <= 0.0f) {
+				game_win_timer = 0.0f;
+				scene = Scene::Outro_1player;
+			}
+		}
+
+		if(remaining_enemy_count_to_spawn > 0) {
+			enemy_spawn_timer -= delta_time;
+			if(enemy_spawn_timer <= 0.0f) {
+				enemy_spawn_timer = Enemy_Spawn_Time;
+
+				if(enemy_tanks.size() < max_enemy_count_on_screen) {
+					Tank enemy = {};
+					enemy.dir = Entity_Direction::Up;
+					enemy.position = Enemy_Spawner_Locations[enamy_spawn_point_random_dist(random_engine)];
+					add_spawn_effect(enemy.position);
+					enemy_tanks.push_back(enemy);
+					remaining_enemy_count_to_spawn -= 1;
+				}
+			}
+		}
+
+		for(auto& enemy : enemy_tanks) {
+
+		}
+
+		std::erase_if(enemy_tanks,[](const Tank& tank) { return tank.destroyed; });
+	}
+
 	void Game::update(float delta_time) {
 		if(platform->was_key_pressed(Keycode::F3)) {
 			show_fps = !show_fps;
@@ -223,6 +254,8 @@ namespace core {
 				if(platform->was_key_pressed(Keycode::Return)) {
 					switch(current_main_menu_option) {
 						case 0: {
+							current_stage_index = 0;
+							player_lifes = 3;
 							scene = Scene::Intro_1player;
 							break;
 						}
@@ -262,7 +295,7 @@ namespace core {
 			}
 			case Scene::Intro_1player: {
 				update_timer += delta_time;
-				static constexpr float Intro_Screen_Duration = 0.0f;
+				static constexpr float Intro_Screen_Duration = 2.5f;
 				if(update_timer >= Intro_Screen_Duration) {
 					update_timer = 0.0f;
 					
@@ -293,11 +326,15 @@ namespace core {
 					player_tank.destroyed = false;
 					player_tank.dir = Entity_Direction::Up;
 					player_tank.position = eagle.position - Vec2{3.0f,0.0f};
-					player_lifes = 3;
 					bullets.clear();
 					enemy_tanks.clear();
 					spawn_effects.clear();
 					explosions.clear();
+
+					max_enemy_count_on_screen = 4;
+					remaining_enemy_count_to_spawn = 1;
+					enemy_spawn_timer = Enemy_Spawn_Time;
+					game_win_timer = 1.0f;
 
 					scene = Scene::Game_1player;
 				}
@@ -437,7 +474,14 @@ namespace core {
 					}
 				}
 
-				std::erase_if(enemy_tanks,[](const Tank& tank) { return tank.destroyed; });
+				update_enemies(delta_time);
+				break;
+			}
+			case Scene::Outro_1player: {
+				if(platform->was_key_pressed(Keycode::Return)) {
+					current_stage_index += 1;
+					scene = Scene::Intro_1player;
+				}
 				break;
 			}
 			case Scene::Construction: {
@@ -527,6 +571,20 @@ namespace core {
 				break;
 			}
 			case Scene::Intro_1player: {
+				char buffer[32] = {};
+				int count = std::snprintf(buffer,sizeof(buffer) - 1,"Stage %zu",current_stage_index + 1);
+				if(count < 0) throw Runtime_Exception("Couldn't create intro's text.");
+
+				auto rect = renderer->compute_text_dims({},{0.5f,0.5f},buffer);
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,3.0f},{0.5f,0.5f},{1,1,1},buffer);
+
+				count = std::snprintf(buffer,sizeof(buffer) - 1,"x%" PRIu32,player_lifes);
+				if(count < 0) throw Runtime_Exception("Couldn't create intro's text.");
+
+				rect = renderer->compute_text_dims({},{0.5f,0.5f},buffer);
+				renderer->draw_text({Background_Tile_Count_X / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},buffer);
+
+				renderer->draw_sprite({Background_Tile_Count_X / 2.0f - 0.75f,5.0f},{1.0f,1.0f},0.0f,entity_sprites,Player_Tank_Sprite_Layer_Index);
 				break;
 			}
 			case Scene::Game_1player: {
@@ -575,9 +633,21 @@ namespace core {
 				}
 
 				renderer->draw_sprite({0.25f,Background_Tile_Count_Y - 0.25f,1.0f},{0.5f,0.5f},0,entity_sprites,Player_Tank_Sprite_Layer_Index);
-				char lifes_buffer[32] = {};
-				int count = std::snprintf(lifes_buffer,sizeof(lifes_buffer) - 1,"x%" PRIu32,player_lifes);
-				if(count > 0) renderer->draw_text({0.75f,Background_Tile_Count_Y - 0.25f,1.0f},{0.5f,0.5f},{1,1,1},lifes_buffer);
+				char text_buffer[32] = {};
+				int count = std::snprintf(text_buffer,sizeof(text_buffer) - 1,"x%" PRIu32,player_lifes);
+				if(count > 0) renderer->draw_text({0.75f,Background_Tile_Count_Y - 0.25f,1.0f},{0.5f,0.5f},{1,1,1},text_buffer);
+
+				renderer->draw_sprite({8.25f,Background_Tile_Count_Y - 0.25f,1.0f},{0.5f,0.5f},0,entity_sprites,Enemy_Tank_Sprite_Layer_Index);
+				count = std::snprintf(text_buffer,sizeof(text_buffer) - 1,"x%" PRIu32,remaining_enemy_count_to_spawn);
+				if(count > 0) renderer->draw_text({8.75f,Background_Tile_Count_Y - 0.25f,1.0f},{0.5f,0.5f},{1,1,1},text_buffer);
+				break;
+			}
+			case Scene::Outro_1player: {
+				auto rect = renderer->compute_text_dims({},{0.5f,0.5f},"Stage cleared!");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,3.0f},{0.5f,0.5f},{1,1,1},"Stage cleared!");
+
+				rect = renderer->compute_text_dims({},{0.5f,0.5f},"Press 'Enter' to advance to the next stage.");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.5f,0.5f},{1,1,1},"Press 'Enter' to advance to the next stage.");
 				break;
 			}
 			case Scene::Construction: {

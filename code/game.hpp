@@ -96,6 +96,7 @@ namespace core {
 		[[nodiscard]] bool quit_requested() const noexcept;
 	private:
 		void update_player(float delta_time);
+		void update_enemies(float delta_time);
 		void add_spawn_effect(Vec2 position);
 		void add_explosion(Vec2 position,float delta_time);
 		void save_map(const char* file_path);
@@ -130,6 +131,13 @@ namespace core {
 		std::vector<Spawn_Effect> spawn_effects;
 		float player_shoot_cooldown;
 		float player_respawn_timer;
+		std::mt19937_64 random_engine;
+		std::uniform_int_distribution<std::size_t> enamy_spawn_point_random_dist;
+		std::uint32_t max_enemy_count_on_screen;
+		std::uint32_t remaining_enemy_count_to_spawn;
+		float enemy_spawn_timer;
+		float game_win_timer;
+		std::size_t current_stage_index;
 	};
 }
 #endif
