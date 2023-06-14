@@ -7,7 +7,6 @@
 #include "game.hpp"
 #include "exceptions.hpp"
 
-
 namespace core {
 	static constexpr float Main_Menu_First_Option_Y_Offset = 6.0f;
 	static constexpr const char* Main_Menu_Options[] = {"1 player","2 players","Load Level","Construction","Quit"};
@@ -32,96 +31,9 @@ namespace core {
 	static constexpr Vec2 Player_Tank_Bullet_Firing_Positions[] = {{0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f}};
 	static constexpr Vec2 Second_Player_Tank_Bullet_Firing_Positions[] = { {0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f} };
 
-	Tile mapArray[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2];
-	void saveTheMap(std::string filename, Tile mapArraytemp[Background_Tile_Count_X * 2][Background_Tile_Count_Y * 2])
-	{
-
-
-		std::ofstream save;
-		save.open(filename, std::ios::out);
-		if (save.good())
-		{
-			for (int i = 0; i < Background_Tile_Count_X * 2; i++)
-			{
-				for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
-				{
-
-					save << mapArraytemp[i][j].template_index << ",";
-					save << mapArraytemp[i][j].health << ",";
-					save << ";";
-
-				}
-				save << "\n";
-			}
-
-		}
-		else
-		{
-			exit(EXIT_FAILURE);
-		}
-		save.close();
-		//return mapArraytemp[Background_Tile_Count_Y][Background_Tile_Count_X];
-	}
-	Tile** loadMap(std::string filename)
-	{
-		Tile** arr = new Tile * [Background_Tile_Count_X * 2];
-		std::string readdata;//data read from the file
-		int passed;//data passed that are meant to be loaded into the array
-		int tempint;
-		std::ifstream load;
-		load.open(filename);
-		if (load.good())
-		{
-			if (load.eof())
-			{
-				exit;
-			}
-			else
-			{
-				for (int i = 0; i < Background_Tile_Count_X * 2; i++)
-				{
-					arr[i] = new Tile[Background_Tile_Count_Y * 2];
-					for (int j = 0; j < Background_Tile_Count_Y * 2; j++)
-					{
-						if (j == 10 && i == 8)
-						{
-							tempint = 10;
-							continue;
-
-						}
-						else
-						{
-							getline(load, readdata, ',');
-							passed = std::stoi(readdata);
-							arr[i][j].template_index = passed;
-							getline(load, readdata, ',');
-							passed = std::stoi(readdata);
-							arr[i][j].health = passed;
-						}
-
-
-					}
-					if (tempint == 10 && i == 8)
-					{
-						tempint = 0;
-						continue;
-					}
-					else
-					{
-						getline(load, readdata, '\n');
-					}
-				}
-			}
-		}
-		return arr;
-
-
-	}
-
-
 	Game::Game(Renderer* _renderer,Platform* _platform) : renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),
 		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
-		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),eagle(),game_lose_timer(),spawn_effects() {
+		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),second_player_lifes(),player_tank(),second_tank(),eagle(),game_lose_timer(),spawn_effects() {
 		tiles_texture = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
 		construction_place_marker = renderer->sprite("./assets/marker.bmp");
 		entity_sprites = renderer->sprite_atlas("./assets/entities_32x32.bmp",32);
@@ -821,7 +733,6 @@ namespace core {
 				}
 				break;
 			}
-
 			case Scene::Construction: {
 				auto mouse_pos = platform->mouse_position();
 				auto dims = renderer->render_client_rect_dimensions();
@@ -837,16 +748,12 @@ namespace core {
 							if(construction_current_tile_template_index != Invalid_Tile_Index) {
 								Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
 								tile.template_index = construction_current_tile_template_index;
-								mapArray[construction_marker_pos.x][construction_marker_pos.y].template_index = construction_current_tile_template_index;
 								tile.health = tile_templates[tile.template_index].health;
-								mapArray[construction_marker_pos.x][construction_marker_pos.y].health = tile_templates[tile.template_index].health;
 							}
 						}
 						if(platform->was_key_pressed(Keycode::Mouse_Right)) {
 							Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
 							tile.template_index = Invalid_Tile_Index;
-							mapArray[construction_marker_pos.x][construction_marker_pos.y].template_index = Invalid_Tile_Index;
-							mapArray[construction_marker_pos.x][construction_marker_pos.y].health = 0;
 						}
 						if(platform->was_key_pressed(Keycode::Mouse_Middle)) {
 							Tile& tile = tiles[construction_marker_pos.y * (Background_Tile_Count_X * 2) + construction_marker_pos.x];
@@ -854,6 +761,8 @@ namespace core {
 						}
 						if(platform->was_key_pressed(Keycode::E)) construction_choosing_tile = true;
 						if(platform->was_key_pressed(Keycode::Escape)) scene = Scene::Main_Menu;
+						if(platform->was_key_pressed(Keycode::S)) save_map("./map.txt");
+						if(platform->was_key_pressed(Keycode::L)) load_map("./map.txt");
 					}
 				}
 				else {
@@ -1089,5 +998,37 @@ namespace core {
 
 	void Game::add_explosion(Vec2 position,float delta_time) {
 		explosions.push_back({{position.x,position.y,0.3f},{1.0f,1.0f},1.0f,0,0,((int)(delta_time * 16384) % 8)});
+	}
+
+	void Game::save_map(const char* file_path) {
+		static char name_buffer[256] = {};
+		std::strcpy(name_buffer,file_path);
+
+		std::ofstream file{name_buffer,std::ios::binary};
+		if(!file.is_open()) throw File_Open_Exception(name_buffer);
+
+		for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
+			for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
+				const auto& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+				file << tile.template_index << " " << tile.health;
+				if((x + 1) < (Background_Tile_Count_X * 2)) file << " ";
+			}
+			file << "\n";
+		}
+	}
+
+	void Game::load_map(const char* file_path) {
+		static char name_buffer[256] = {};
+		std::strcpy(name_buffer,file_path);
+
+		std::ifstream file{name_buffer,std::ios::binary};
+		if(!file.is_open()) throw File_Open_Exception(name_buffer);
+
+		for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
+			for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
+				auto& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+				file >> tile.template_index >> tile.health;
+			}
+		}
 	}
 }

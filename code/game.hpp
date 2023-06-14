@@ -94,13 +94,15 @@ namespace core {
 		Game(Renderer* _renderer,Platform* _platform);
 
 		void update(float delta_time);
-		void update_2players(float delta_time);
 		void render(float delta_time);
 		[[nodiscard]] bool quit_requested() const noexcept;
 	private:
+		void update_2players(float delta_time);
 		void update_player(float delta_time);
 		void add_spawn_effect(Vec2 position);
 		void add_explosion(Vec2 position,float delta_time);
+		void save_map(const char* file_path);
+		void load_map(const char* file_path);
 		static inline constexpr std::uint32_t Invalid_Tile_Index = std::uint32_t(-1);
 
 		Renderer* renderer;
