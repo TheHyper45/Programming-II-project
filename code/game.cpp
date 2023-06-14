@@ -294,6 +294,7 @@ namespace core {
 
 					Rect eagle_rect = {eagle.position.x - Eagle_Size.x / 2.0f,eagle.position.y - Eagle_Size.y / 2.0f,Eagle_Size.x,Eagle_Size.y};
 					if(!eagle.destroyed && bullet_rect.overlaps(eagle_rect)) {
+						add_explosion(eagle.position,delta_time);
 						eagle.destroyed = true;
 						bullet.destroyed = true;
 						static constexpr float Time_To_Lose = 1.0f;
@@ -313,12 +314,13 @@ namespace core {
 							if(tile.template_index == Invalid_Tile_Index) continue;
 
 							const auto& tile_template = tile_templates[tile.template_index];
-
 							if(tile_template.flag != Tile_Flag::Solid) continue;
 
-							//bullet.position.x = end_x / 2.0f - Bullet_Size.x / 2.0f - 0.001f;
 							bullet.destroyed = true;
-							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							if(tile.health == 0) {
+								tile.template_index = Invalid_Tile_Index;
+								add_explosion(bullet.position,delta_time);
+							}
 							else tile.health -= 1;
 						}
 					}
@@ -331,10 +333,11 @@ namespace core {
 							const auto& tile_template = tile_templates[tile.template_index];
 							if(tile_template.flag != Tile_Flag::Solid) continue;
 
-							//bullet.position.y = end_y / 2.0f - Bullet_Size.y / 2.0f - 0.001f;
-
 							bullet.destroyed = true;
-							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							if(tile.health == 0) {
+								tile.template_index = Invalid_Tile_Index;
+								add_explosion(bullet.position,delta_time);
+							}
 							else tile.health -= 1;
 						}
 					}
@@ -347,10 +350,11 @@ namespace core {
 							const auto& tile_template = tile_templates[tile.template_index];
 							if(tile_template.flag != Tile_Flag::Solid) continue;
 
-							//bullet.position.x = start_x / 2.0f + Bullet_Size.x + 0.001f;
-
 							bullet.destroyed = true;
-							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							if(tile.health == 0) {
+								tile.template_index = Invalid_Tile_Index;
+								add_explosion(bullet.position,delta_time);
+							}
 							else tile.health -= 1;
 						}
 					}
@@ -363,15 +367,12 @@ namespace core {
 							const auto& tile_template = tile_templates[tile.template_index];
 							if(tile_template.flag != Tile_Flag::Solid) continue;
 
-							//bullet.position.y = start_y / 2.0f + Bullet_Size.y + 0.001f;
-
 							bullet.destroyed = true;
-							if(tile.health == 0) tile.template_index = Invalid_Tile_Index;
-							else tile.health -= 1;
-							if (tile_template.flag == Tile_Flag::Solid) {
-								explosions.push_back({ {bullet.position.x,bullet.position.y,0.3f},{1.0f,1.0f},1.0f,0,0,((int)(delta_time * 16384) % 8) });
-								bullet.destroyed = true;
+							if(tile.health == 0) {
+								tile.template_index = Invalid_Tile_Index;
+								add_explosion(bullet.position,delta_time);
 							}
+							else tile.health -= 1;
 						}
 					}
 				}
@@ -598,5 +599,9 @@ namespace core {
 		effect.position = position;
 		effect.timer = Spawn_Effect_Frame_Duration;
 		spawn_effects.push_back(effect);
+	}
+
+	void Game::add_explosion(Vec2 position,float delta_time) {
+		explosions.push_back({{position.x,position.y,0.3f},{1.0f,1.0f},1.0f,0,0,((int)(delta_time * 16384) % 8)});
 	}
 }

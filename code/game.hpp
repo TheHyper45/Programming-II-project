@@ -99,6 +99,7 @@ namespace core {
 	private:
 		void update_player(float delta_time);
 		void add_spawn_effect(Vec2 position);
+		void add_explosion(Vec2 position,float delta_time);
 		static inline constexpr std::uint32_t Invalid_Tile_Index = std::uint32_t(-1);
 
 		Renderer* renderer;
