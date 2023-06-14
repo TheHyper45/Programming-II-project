@@ -78,9 +78,7 @@ namespace core {
 		std::uint32_t current_frame;
 		float timer;
 	};
-
-	struct  Explosion
-	{
+	struct Explosion {
 		Vec3 position;
 		Vec2 size;
 		float timer;
@@ -111,11 +109,8 @@ namespace core {
 		Sprite_Index tiles_texture;
 		Sprite_Index construction_place_marker;
 		Sprite_Index entity_sprites;
-<<<<<<< HEAD
 		Sprite_Index spawn_effect_sprite_atlas;
-=======
 		Sprite_Index explosion_sprite;
->>>>>>> 0a39a9ad0ad2c21d441a1c788ffadf94acd31c9f
 		Point construction_marker_pos;
 		bool construction_choosing_tile;
 		Point construction_tile_choice_marker_pos;
