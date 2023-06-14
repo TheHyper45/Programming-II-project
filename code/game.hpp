@@ -74,6 +74,16 @@ namespace core {
 		bool destroyed;
 	};
 
+	struct  Explosion
+	{
+		Vec3 position;
+		Vec2 size;
+		float timer;
+		int sprite_index;
+		bool destroyed;
+		int testure_serie;
+	};
+
 	class Game {
 	public:
 		Game(const Game&) = delete;
@@ -95,6 +105,7 @@ namespace core {
 		Sprite_Index tiles_texture;
 		Sprite_Index construction_place_marker;
 		Sprite_Index entity_sprites;
+		Sprite_Index explosion_sprite;
 		Point construction_marker_pos;
 		bool construction_choosing_tile;
 		Point construction_tile_choice_marker_pos;
@@ -108,6 +119,7 @@ namespace core {
 		Eagle eagle;
 		std::vector<Bullet> bullets;
 		std::vector<Tank> enemy_tanks;
+		std::vector<Explosion> explosions;
 		float game_lose_timer;
 	};
 }
