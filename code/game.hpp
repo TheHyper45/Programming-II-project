@@ -3,6 +3,7 @@
 
 #include <list>
 #include <vector>
+#include <random>
 #include <cstddef>
 #include "platform.hpp"
 #include "renderer.hpp"
@@ -13,9 +14,6 @@ namespace core {
 		Intro_1player,
 		Game_1player,
 		Outro_1player,
-		Intro_2player,
-		Game_2player,
-		Outro_2players,
 		Construction,
 		Level_Selection,
 		Game_Over
@@ -84,7 +82,7 @@ namespace core {
 		float timer;
 		int sprite_index;
 		bool destroyed;
-		int testure_serie;
+		int texture_serie;
 	};
 
 	class Game {
@@ -97,7 +95,6 @@ namespace core {
 		void render(float delta_time);
 		[[nodiscard]] bool quit_requested() const noexcept;
 	private:
-		void update_2players(float delta_time);
 		void update_player(float delta_time);
 		void add_spawn_effect(Vec2 position);
 		void add_explosion(Vec2 position,float delta_time);
@@ -124,15 +121,15 @@ namespace core {
 		bool quit;
 		Tile tiles[(Background_Tile_Count_X * 2) * (Background_Tile_Count_Y * 2)];
 		std::uint32_t player_lifes;
-		std::uint32_t second_player_lifes;
 		Tank player_tank;
-		Tank second_tank;
 		Eagle eagle;
 		std::vector<Bullet> bullets;
 		std::vector<Tank> enemy_tanks;
 		std::vector<Explosion> explosions;
 		float game_lose_timer;
 		std::vector<Spawn_Effect> spawn_effects;
+		float player_shoot_cooldown;
+		float player_respawn_timer;
 	};
 }
 #endif
