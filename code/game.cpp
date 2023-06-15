@@ -8,9 +8,12 @@
 #include "exceptions.hpp"
 
 namespace core {
-	static constexpr float Main_Menu_First_Option_Y_Offset = 6.0f;
+	static constexpr float Main_Menu_First_Option_Y_Offset = 7.0f;
 	static constexpr const char* Main_Menu_Options[] = {"1 player","2 players","Load Level","Construction","Quit"};
 	static constexpr std::size_t Main_Menu_Options_Count = sizeof(Main_Menu_Options) / sizeof(*Main_Menu_Options);
+	static constexpr float Map_First_Option_Y_Offset = 5.0f;
+	static constexpr const char* Map_Options[] = { "Level 1","Level 2","Level 3","Level 4","Level 5 " };
+	static constexpr std::size_t Map_Options_Count = sizeof(Map_Options) / sizeof(*Map_Options);
 	static constexpr float Tank_Speed = 4.0f;
 	static constexpr float Bullet_Speed = 12.0f;
 	static constexpr std::uint32_t Player_Tank_Sprite_Layer_Index = 0;
@@ -309,9 +312,10 @@ namespace core {
 		if(platform->was_key_pressed(Keycode::F3)) {
 			show_fps = !show_fps;
 		}
-
+		_sleep(1);
 		switch(scene) {
 			case Scene::Main_Menu: {
+				load_map("./map_menu.txt");
 				if(platform->was_key_pressed(Keycode::Down)) {
 					current_main_menu_option += 1;
 					if(current_main_menu_option >= Main_Menu_Options_Count) current_main_menu_option = 0;
@@ -364,6 +368,7 @@ namespace core {
 			}
 			case Scene::Intro_1player: {
 				update_timer += delta_time;
+<<<<<<< HEAD
 				static constexpr float Intro_Screen_Duration = 2.5f;
 				if(update_timer >= Intro_Screen_Duration) {
 					update_timer = 0.0f;
@@ -390,6 +395,40 @@ namespace core {
 					tiles[6 * (Background_Tile_Count_X * 2) + 8] = Tile{0};
 					tiles[6 * (Background_Tile_Count_X * 2) + 11] = Tile{0};
 
+=======
+				static constexpr float Intro_Screen_Duration = 30.0f; 
+				if (platform->was_key_pressed(Keycode::Down)) {
+					current_map_option += 1;
+					if (current_map_option >= Main_Menu_Options_Count) current_map_option = 0;
+				}
+				if (platform->was_key_pressed(Keycode::Up)) {
+					if (current_map_option == 0) current_map_option = Main_Menu_Options_Count;
+					current_map_option -= 1;
+				}
+				switch (current_map_option) {
+					case 0: {
+						load_map("./map1.txt");
+						break;
+					}
+					case 1: {
+						load_map("./map2.txt");
+						break;
+					}
+					case 2: {
+						load_map("./map3.txt");
+						break;
+					}
+					case 3: {load_map("./map4.txt");
+						break;
+					}
+					case 4: {load_map("./map5.txt");
+						break;
+					}
+
+				}
+				if(update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
+					update_timer = 0.0f;
+>>>>>>> db187fc3be60c08bbc206f16d010c99421922064
 					eagle.destroyed = false;
 					eagle.position = {Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f};
 					player_tank.destroyed = false;
@@ -638,9 +677,27 @@ namespace core {
 					Vec3 color = (current_main_menu_option == i) ? Vec3{1,1,0} : Vec3{1,1,1};
 					renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Main_Menu_First_Option_Y_Offset + float(i) * 0.5f,1},{0.25f,0.25f},color,Main_Menu_Options[i]);
 				}
+				if (!construction_choosing_tile) {
+					for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
+						for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
+							const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+							if (tile.template_index == Invalid_Tile_Index) continue;
+							const auto& tile_template = tile_templates[tile.template_index];
+
+							float z_order = 0.0f;
+							switch (tile_template.flag) {
+							case Tile_Flag::Above: z_order = 0.75f; break;
+							case Tile_Flag::Bulletpass:
+							case Tile_Flag::Below: z_order = 0.25f; break;
+							}
+							renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
+						}
+					}
+				}
 				break;
 			}
 			case Scene::Intro_1player: {
+<<<<<<< HEAD
 				char buffer[32] = {};
 				int count = std::snprintf(buffer,sizeof(buffer) - 1,"Stage %zu",current_stage_index + 1);
 				if(count < 0) throw Runtime_Exception("Couldn't create intro's text.");
@@ -655,6 +712,49 @@ namespace core {
 				renderer->draw_text({Background_Tile_Count_X / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},buffer);
 
 				renderer->draw_sprite({Background_Tile_Count_X / 2.0f - 0.75f,5.0f},{1.0f,1.0f},0.0f,entity_sprites,Player_Tank_Sprite_Layer_Index);
+=======
+				for (std::size_t i = 0; i < Map_Options_Count; i += 1) {
+					auto rect = renderer->compute_text_dims({ 0,0,1 }, { 0.25f,0.25f }, Map_Options[i]);
+					Vec3 color = (current_map_option == i) ? Vec3{1, 1, 0} : Vec3{ 1,1,1 };
+					renderer->draw_text({ Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Map_First_Option_Y_Offset + float(i) * 0.5f,1 }, { 0.25f,0.25f }, color, Map_Options[i]);
+				}
+				if (!construction_choosing_tile) {
+					for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
+						for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
+							const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+							if (tile.template_index == Invalid_Tile_Index) continue;
+							const auto& tile_template = tile_templates[tile.template_index];
+
+							float z_order = 0.0f;
+							switch (tile_template.flag) {
+							case Tile_Flag::Above: z_order = 0.75f; break;
+							case Tile_Flag::Bulletpass:
+							case Tile_Flag::Below: z_order = 0.25f; break;
+							}
+							renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
+						}
+					}
+				}
+				break;
+				for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
+					for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
+						const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+						if (tile.template_index == Invalid_Tile_Index) continue;
+						const auto& tile_template = tile_templates[tile.template_index];
+
+						float z_order = 0.0f;
+						switch (tile_template.flag) {
+						case Tile_Flag::Above: z_order = 0.75f; break;
+						case Tile_Flag::Bulletpass:
+						case Tile_Flag::Below: z_order = 0.25f; break;
+						}
+						renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
+					}
+				}
+
+				
+				renderer->draw_text({ 4,5,0 }, { 1.0f,1.0f }, { 1,1,0 }, "Choose a level");
+>>>>>>> db187fc3be60c08bbc206f16d010c99421922064
 				break;
 			}
 			case Scene::Game_1player: {
