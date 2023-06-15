@@ -722,44 +722,184 @@ namespace core {
 							if (current_map_option == 0) current_map_option = Main_Menu_Options_Count;
 							current_map_option -= 1;
 						}
-						switch (current_map_option) {
-						case 0: {
-							load_map("./assets/maps/map1.txt");
-							break;
+						current_stage_index = current_map_option;
+						switch (current_stage_index) {
+						case 0: load_map("./assets/maps/map1.txt"); break;
+						case 1: load_map("./assets/maps/map2.txt"); break;
+						case 2: load_map("./assets/maps/map3.txt"); break;
+						case 3: load_map("./assets/maps/map4.txt"); break;
+						case 4: load_map("./assets/maps/map5.txt"); break;
 						}
-						case 1: {
-							load_map("./assets/maps/map2.txt");
-							break;
-						}
-						case 2: {
-							load_map("./assets/maps/map3.txt");
-							break;
-						}
-						case 3: {load_map("./assets/maps/map4.txt");
-							break;
-						}
-						case 4: {load_map("./assets/maps/map5.txt");
-							break;
-						}
-							  if (update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
-								  update_timer = 0.0f;
-								  eagle.destroyed = false;
-								  eagle.position = { Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f };
-								  player_tank.destroyed = false;
-								  player_tank.dir = Entity_Direction::Up;
-								  player_tank.position = eagle.position - Vec2{3.0f, 0.0f};
-								  player_lifes = 3;
-								  bullets.clear();
-								  enemy_tanks.clear();
-								  spawn_effects.clear();
-								  scene = Scene::Level_Selected;
-							  }
+					if (update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
+						update_timer = 0.0f;
+						eagle.destroyed = false;
+						eagle.position = { Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f };
+						player_tank.destroyed = false;
+						player_tank.dir = Entity_Direction::Up;
+						player_tank.position = eagle.position - Vec2{3.0f, 0.0f};
+						player_lifes = 3;
+						bullets.clear();
+						enemy_tanks.clear();
+						spawn_effects.clear();
+
+						max_enemy_count_on_screen = 3;
+						remaining_enemy_count_to_spawn = 12;
+						enemy_spawn_timer = Enemy_Spawn_Time;
+						game_win_timer = 1.0f;
+						game_lose_timer = 1.0f;
+
+						scene = Scene::Level_Selected;
+						
 						}
 					}
 				}
 				break;
 			}
-			case Scene::Level_Selected: {};
+			case Scene::Level_Selected: {	
+				if (platform->was_key_pressed(Keycode::Escape)) {
+				load_map("./assets/maps/map_menu.txt");
+				scene = Scene::Main_Menu;
+				break;
+			}
+			update_player(delta_time);
+
+				Rect screen_rect = { 0.0f,0.0f,float(Background_Tile_Count_X),float(Background_Tile_Count_Y) };
+				Urect tile_screen_rect = { 0.0f,0.0f,Background_Tile_Count_X * 2,Background_Tile_Count_Y * 2 };
+				for (auto& bullet : bullets) {
+					bullet.position += core::entity_direction_to_vector(bullet.dir) * Bullet_Speed * delta_time;
+					const auto& relative_bounding_box = Bullet_Bounding_Boxes[std::size_t(bullet.dir)];
+
+					Rect bullet_rect = {
+						bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x,
+						bullet.position.y - Bullet_Size.y / 2.0f + relative_bounding_box.y,
+						relative_bounding_box.width,
+						relative_bounding_box.height
+					};
+					if (!screen_rect.overlaps(bullet_rect)) bullet.destroyed = true;
+
+					Rect eagle_rect = { eagle.position.x - Eagle_Size.x / 2.0f,eagle.position.y - Eagle_Size.y / 2.0f,Eagle_Size.x,Eagle_Size.y };
+					if (!eagle.destroyed && bullet_rect.overlaps(eagle_rect)) {
+						add_explosion(eagle.position, delta_time);
+						eagle.destroyed = true;
+						bullet.destroyed = true;
+						static constexpr float Time_To_Lose = 1.0f;
+						game_lose_timer = Time_To_Lose;
+						continue;
+					}
+
+					Rect player_rect = { player_tank.position.x - Tank_Size.x / 2.0f,player_tank.position.y - Tank_Size.y / 2.0f,1.0f,1.0f };
+					if (!player_tank.destroyed && bullet_rect.overlaps(player_rect) && !bullet.fired_by_player) {
+						if (player_invulnerability_timer <= 0.0f) {
+							add_explosion(player_tank.position, delta_time);
+							player_tank.destroyed = true;
+							bullet.destroyed = true;
+							static constexpr float Player_Respawn_Time = 2.0f;
+							player_respawn_timer = Player_Respawn_Time;
+						}
+						else add_explosion(player_tank.position, delta_time);
+						continue;
+					}
+
+					for (auto& enemy_tank : enemy_tanks) {
+						Rect enemy_rect = { enemy_tank.position.x - Tank_Size.x / 2.0f,enemy_tank.position.y - Tank_Size.y / 2.0f,1.0f,1.0f };
+						if (bullet_rect.overlaps(enemy_rect) && bullet.fired_by_player) {
+							add_explosion(enemy_tank.position, delta_time);
+							enemy_tank.destroyed = true;
+							bullet.destroyed = true;
+							break;
+						}
+					}
+					if (bullet.destroyed) continue;
+
+					std::int32_t start_x = std::int32_t((bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x) * 2.0f);
+					std::int32_t start_y = std::int32_t((bullet.position.y - Bullet_Size.y / 2.0f + relative_bounding_box.y) * 2.0f);
+					std::int32_t end_x = std::int32_t((bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x + relative_bounding_box.width) * 2.0f);
+					std::int32_t end_y = std::int32_t((bullet.position.y - Bullet_Size.y / 2.0f + relative_bounding_box.y + relative_bounding_box.height) * 2.0f);
+
+					if (bullet.dir == Entity_Direction::Right && (end_x >= 0 && end_x < Background_Tile_Count_X * 2)) {
+						for (std::int32_t y = start_y; y <= end_y; y += 1) {
+							if (y < 0 || y >= Background_Tile_Count_Y * 2) continue;
+							auto& tile = tiles[y * (Background_Tile_Count_X * 2) + end_x];
+							if (tile.template_index == Invalid_Tile_Index) continue;
+
+							const auto& tile_template = tile_templates[tile.template_index];
+							if (tile_template.flag != Tile_Flag::Solid) continue;
+
+							bullet.destroyed = true;
+							if (tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							else tile.health -= 1;
+							add_explosion(bullet.position, delta_time);
+						}
+					}
+					if (bullet.dir == Entity_Direction::Down && (end_y >= 0 && end_y < Background_Tile_Count_Y * 2)) {
+						for (std::int32_t x = start_x; x <= end_x; x += 1) {
+							if (x < 0 || x >= Background_Tile_Count_X * 2) continue;
+							auto& tile = tiles[end_y * (Background_Tile_Count_X * 2) + x];
+							if (tile.template_index == Invalid_Tile_Index) continue;
+
+							const auto& tile_template = tile_templates[tile.template_index];
+							if (tile_template.flag != Tile_Flag::Solid) continue;
+
+							bullet.destroyed = true;
+							if (tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							else tile.health -= 1;
+							add_explosion(bullet.position, delta_time);
+						}
+					}
+					if (bullet.dir == Entity_Direction::Left && (start_x >= 0 && start_x < Background_Tile_Count_X * 2)) {
+						for (std::int32_t y = start_y; y <= end_y; y += 1) {
+							if (y < 0 || y >= Background_Tile_Count_Y * 2) continue;
+							auto& tile = tiles[y * (Background_Tile_Count_X * 2) + start_x];
+							if (tile.template_index == Invalid_Tile_Index) continue;
+
+							const auto& tile_template = tile_templates[tile.template_index];
+							if (tile_template.flag != Tile_Flag::Solid) continue;
+
+							bullet.destroyed = true;
+							if (tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							else tile.health -= 1;
+							add_explosion(bullet.position, delta_time);
+						}
+					}
+					if (bullet.dir == Entity_Direction::Up && (start_y >= 0 && start_y < Background_Tile_Count_Y * 2)) {
+						for (std::int32_t x = start_x; x <= end_x; x += 1) {
+							if (x < 0 || x >= Background_Tile_Count_X * 2) continue;
+							auto& tile = tiles[start_y * (Background_Tile_Count_X * 2) + x];
+							if (tile.template_index == Invalid_Tile_Index) continue;
+
+							const auto& tile_template = tile_templates[tile.template_index];
+							if (tile_template.flag != Tile_Flag::Solid) continue;
+
+							bullet.destroyed = true;
+							if (tile.health == 0) tile.template_index = Invalid_Tile_Index;
+							else tile.health -= 1;
+							add_explosion(bullet.position, delta_time);
+						}
+					}
+				}
+				std::erase_if(bullets, [](const Bullet& bullet) { return bullet.destroyed; });
+
+				for (auto& effect : spawn_effects) {
+					if (effect.current_frame >= Spawn_Effect_Layer_Count) continue;
+					effect.timer -= delta_time;
+					if (effect.timer <= 0.0f) {
+						effect.timer = Spawn_Effect_Frame_Duration;
+						effect.current_frame += 1;
+					}
+				}
+				std::erase_if(spawn_effects, [](const Spawn_Effect& effect) { return effect.current_frame >= Spawn_Effect_Layer_Count; });
+
+				if (eagle.destroyed) {
+					game_lose_timer -= delta_time;
+					if (game_lose_timer <= 0.0f) {
+						game_lose_timer = 0.0f;
+						scene = Scene::Game_Over;
+					}
+				}
+
+				update_enemies(delta_time);
+				break;
+			};
 			case Scene::Construction: {
 				auto mouse_pos = platform->mouse_position();
 				auto dims = renderer->render_client_rect_dimensions();
@@ -974,9 +1114,51 @@ namespace core {
 				break; 
 			}
 			case Scene::Level_Selected: {
+
 				render_map();
-				break;
+				for (const auto& bullet : bullets) {
+					renderer->draw_sprite({ bullet.position.x,bullet.position.y }, { 1.0f,1.0f }, core::entity_direction_to_rotation(bullet.dir), entity_sprites, Bullet_Sprite_Layer_Index);
 				}
+				for (auto& explosion : explosions) {
+					if (explosion.sprite_index != -1) renderer->draw_sprite(explosion.position, explosion.size, 0, explosion_sprite, explosion.sprite_index);
+					explosion.sprite_index = 8 * explosion.texture_serie + (7 - (int)(explosion.timer * 8));
+					explosion.timer -= delta_time;
+					if (explosion.timer < 0) {
+						explosion.destroyed = 1;
+					}
+				}
+
+				std::erase_if(explosions, [](const Explosion& explosion) { return explosion.destroyed; });
+
+				if (!eagle.destroyed) {
+					renderer->draw_sprite({ eagle.position.x,eagle.position.y,0.5f }, Eagle_Size, 0.0f, entity_sprites, Eagle_Sprite_Layer_Index);
+				}
+				if (!player_tank.destroyed) {
+					renderer->draw_sprite({ player_tank.position.x,player_tank.position.y,0.5f }, Tank_Size, core::entity_direction_to_rotation(player_tank.dir), entity_sprites, Player_Tank_Sprite_Layer_Index);
+					if (player_invulnerability_timer > 0.0f) {
+						renderer->draw_sprite({ player_tank.position.x,player_tank.position.y,0.5f }, Tank_Size, core::entity_direction_to_rotation(player_tank.dir), construction_place_marker);
+					}
+				}
+				for (const auto& enemy_tank : enemy_tanks) {
+					renderer->draw_sprite({ enemy_tank.position.x,enemy_tank.position.y,0.5f }, Tank_Size, core::entity_direction_to_rotation(enemy_tank.dir), entity_sprites, Enemy_Tank_Sprite_Layer_Index);
+				}
+
+				for (const auto& effect : spawn_effects) {
+					renderer->draw_sprite({ effect.position.x,effect.position.y,0.9f }, { 1,1 }, 0, spawn_effect_sprite_atlas, effect.current_frame);
+				}
+
+				renderer->draw_sprite({ 0.25f,Background_Tile_Count_Y - 0.25f,1.0f }, { 0.5f,0.5f }, 0, entity_sprites, Player_Tank_Sprite_Layer_Index);
+				char text_buffer[32] = {};
+				int count = std::snprintf(text_buffer, sizeof(text_buffer) - 1, "x%" PRIu32, player_lifes);
+				if (count > 0) renderer->draw_text({ 0.75f,Background_Tile_Count_Y - 0.25f,1.0f }, { 0.5f,0.5f }, { 1,1,1 }, text_buffer);
+
+				renderer->draw_sprite({ 8.25f,Background_Tile_Count_Y - 0.25f,1.0f }, { 0.5f,0.5f }, 0, entity_sprites, Enemy_Tank_Sprite_Layer_Index);
+				count = std::snprintf(text_buffer, sizeof(text_buffer) - 1, "x%" PRIu32, remaining_enemy_count_to_spawn);
+				if (count > 0) renderer->draw_text({ 8.75f,Background_Tile_Count_Y - 0.25f,1.0f }, { 0.5f,0.5f }, { 1,1,1 }, text_buffer);
+				break;
+			}
+			
+			
 			case Scene::Construction: {
 				if(!construction_choosing_tile) {
 					render_map();
