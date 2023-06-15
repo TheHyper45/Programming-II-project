@@ -591,8 +591,8 @@ namespace core {
 							load_map("./assets/maps/map_menu.txt");
 							scene = Scene::Main_Menu;
 						}
-						if(platform->was_key_pressed(Keycode::S)) save_map("./map.txt");
-						if(platform->was_key_pressed(Keycode::L)) load_map("./map.txt");
+						if(platform->was_key_pressed(Keycode::S)) save_map("./assets/maps/map5.txt");
+						if(platform->was_key_pressed(Keycode::L)) load_map("./assets/maps/map5.txt");
 						if(platform->was_key_pressed(Keycode::B)) {
 							tiles[0 * (Background_Tile_Count_X * 2) + 0] = Tile{11,std::uint32_t(-1)};
 							tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + 0] = Tile{14,std::uint32_t(-1)};
