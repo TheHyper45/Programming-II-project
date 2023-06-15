@@ -34,8 +34,7 @@ namespace core {
 	//Bounding boxes for each 'Entity_Direction' value in order.
 	static constexpr Rect Bullet_Bounding_Boxes[] = {{0.28125f,0.4375f,0.40625f,0.1875f},{0.4375f,0.28125f,0.1875f,0.40625f},{0.3125f,0.40625f,0.40625f,0.1875f},{0.4375f,0.3125f,0.1875f,0.40625f}};
 
-	static constexpr Vec2 Player_Tank_Bullet_Firing_Positions[] = {{0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f}};
-	static constexpr Vec2 Second_Player_Tank_Bullet_Firing_Positions[] = {{0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f}};
+	static constexpr Vec2 Player_Tank_Bullet_Firing_Positions[] = {{0.6f,0.0f},{0.0f,0.6f},{-0.6f,0.0f},{0.0f,-0.6f}};
 
 	Game::Game(Renderer* _renderer,Platform* _platform) : renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),
 		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
@@ -463,11 +462,11 @@ namespace core {
 
 		switch(scene) {
 			case Scene::Main_Menu: {
-				if(platform->was_key_pressed(Keycode::Down)) {
+				if(platform->was_key_pressed(Keycode::Down) || platform->was_key_pressed(Keycode::S)) {
 					current_main_menu_option += 1;
 					if(current_main_menu_option >= Main_Menu_Options_Count) current_main_menu_option = 0;
 				}
-				if(platform->was_key_pressed(Keycode::Up)) {
+				if(platform->was_key_pressed(Keycode::Up) || platform->was_key_pressed(Keycode::W)) {
 					if(current_main_menu_option == 0) current_main_menu_option = Main_Menu_Options_Count;
 					current_main_menu_option -= 1;
 				}
@@ -552,6 +551,12 @@ namespace core {
 				break;
 			}
 			case Scene::Game_1player: {
+				if(platform->was_key_pressed(Keycode::Escape)) {
+					load_map("./assets/maps/map_menu.txt");
+					scene = Scene::Main_Menu;
+					break;
+				}
+
 				update_player(delta_time);
 
 				Rect screen_rect = {0.0f,0.0f,float(Background_Tile_Count_X),float(Background_Tile_Count_Y)};
@@ -709,11 +714,11 @@ namespace core {
 							tiles[y * (Background_Tile_Count_X * 2) + x] = Tile{ Invalid_Tile_Index };
 						}
 						static constexpr float Intro_Screen_Duration = 30.0f;
-						if (platform->was_key_pressed(Keycode::Up)) {
+						if (platform->was_key_pressed(Keycode::Up) || platform->was_key_pressed(Keycode::W)) {
 							current_map_option += 1;
 							if (current_map_option >= Main_Menu_Options_Count) current_map_option = 0;
 						}
-						if (platform->was_key_pressed(Keycode::Down)) {
+						if (platform->was_key_pressed(Keycode::Down) || platform->was_key_pressed(Keycode::S)) {
 							if (current_map_option == 0) current_map_option = Main_Menu_Options_Count;
 							current_map_option -= 1;
 						}
@@ -854,8 +859,18 @@ namespace core {
 				}
 				break;
 			}
-			case Scene::Victory_Screen:
 			case Scene::Game_Over: {
+				if(platform->was_key_pressed(Keycode::Return)) {
+					scene = Scene::Intro_1player;
+					player_lifes = 3;
+				}
+				if(platform->was_key_pressed(Keycode::Escape)) {
+					load_map("./assets/maps/map_menu.txt");
+					scene = Scene::Main_Menu;
+				}
+				break;
+			}
+			case Scene::Victory_Screen: {
 				if(platform->was_key_pressed(Keycode::Return)) {
 					load_map("./assets/maps/map_menu.txt");
 					scene = Scene::Main_Menu;
@@ -1005,8 +1020,8 @@ namespace core {
 					renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},"Your tank has been destroyed.");
 				}
 
-				rect = renderer->compute_text_dims({},{0.5f,0.5f},"Press 'Enter' to return to the main menu.");
-				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.5f,0.5f},{1,1,1},"Press 'Enter' to return to the main menu.");
+				rect = renderer->compute_text_dims({},{0.25f,0.25f},"Press 'Enter' to try again or 'Escape' to leave to the main menu.");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.25f,0.25f},{1,1,1},"Press 'Enter' to try again or 'Escape' to leave to the main menu.");
 				break;
 			}
 			case Scene::Victory_Screen: {
