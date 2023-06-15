@@ -109,6 +109,7 @@ namespace core {
 		Platform* platform;
 		Scene scene;
 		std::size_t current_main_menu_option;
+		std::size_t current_map_option=0;
 		float update_timer;
 		Sprite_Index tiles_texture;
 		Sprite_Index construction_place_marker;
