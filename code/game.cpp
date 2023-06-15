@@ -21,7 +21,7 @@ namespace core {
 	static constexpr Vec2 Eagle_Size = {1.0f,1.0f};
 	static constexpr Vec2 Tank_Size = {1.0f,1.0f};
 	static constexpr Vec2 Bullet_Size = {1.0f,1.0f};
-	static constexpr Vec2 Enemy_Spawner_Locations[] = {{1,1},{Background_Tile_Count_X / 2,1},{Background_Tile_Count_X - 1,1}};
+	static constexpr Vec2 Enemy_Spawner_Locations[] = {{1,1},{Background_Tile_Count_X / 2,1},{Background_Tile_Count_X - 1 - 0.001f,1}};
 	static constexpr std::size_t Enemy_Spawner_Location_Count = sizeof(Enemy_Spawner_Locations) / sizeof(*Enemy_Spawner_Locations);
 	static constexpr std::uint32_t Spawn_Effect_Layer_Count = 7;
 	static constexpr float Spawn_Effect_Frame_Duration = 0.1f;
@@ -38,9 +38,10 @@ namespace core {
 		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
 		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),
 		eagle(),game_lose_timer(),spawn_effects(),enemy_tanks(),player_respawn_timer(),random_engine(),enamy_spawn_point_random_dist(),
-		max_enemy_count_on_screen(),remaining_enemy_count_to_spawn(),enemy_spawn_timer(),game_win_timer(),current_stage_index() {
+		enemy_action_duration_dist(),max_enemy_count_on_screen(),remaining_enemy_count_to_spawn(),enemy_spawn_timer(),game_win_timer(),current_stage_index() {
 		random_engine = std::mt19937_64(std::time(nullptr));
 		enamy_spawn_point_random_dist = std::uniform_int_distribution<std::size_t>(0,Enemy_Spawner_Location_Count - 1);
+		enemy_action_duration_dist = std::uniform_real_distribution<float>(0.5f,3.0f);
 
 		tiles_texture = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
 		construction_place_marker = renderer->sprite("./assets/marker.bmp");
@@ -105,14 +106,23 @@ namespace core {
 	}
 
 	void Game::update_player(float delta_time) {
-		if(player_tank.destroyed) {
+		if(player_tank.destroyed && player_lifes > 0) {
 			player_respawn_timer -= delta_time;
 			if(player_respawn_timer <= 0.0f) {
 				player_respawn_timer = 0.0f;
 				player_tank.destroyed = false;
 				player_tank.dir = Entity_Direction::Up;
 				player_tank.position = eagle.position - Vec2{3.0f,0.0f};
+				player_lifes -= 1;
 				add_spawn_effect(player_tank.position);
+			}
+			return;
+		}
+		if(player_tank.destroyed && player_lifes == 0) {
+			game_lose_timer -= delta_time;
+			if(game_lose_timer <= 0.0f) {
+				game_lose_timer = 0.0f;
+				scene = Scene::Game_Over;
 			}
 			return;
 		}
@@ -220,7 +230,7 @@ namespace core {
 
 				if(enemy_tanks.size() < max_enemy_count_on_screen) {
 					Tank enemy = {};
-					enemy.dir = Entity_Direction::Up;
+					enemy.dir = Entity_Direction::Down;
 					enemy.position = Enemy_Spawner_Locations[enamy_spawn_point_random_dist(random_engine)];
 					add_spawn_effect(enemy.position);
 					enemy_tanks.push_back(enemy);
@@ -230,9 +240,68 @@ namespace core {
 		}
 
 		for(auto& enemy : enemy_tanks) {
+			enemy.enemy_choose_action_timer -= delta_time;
+			if(enemy.enemy_choose_action_timer <= 0.0f) {
+				enemy.enemy_choose_action_timer = enemy_action_duration_dist(random_engine);
+			}
 
+			enemy.position.x += core::entity_direction_to_vector(enemy.dir).x * Tank_Speed * delta_time;
+			enemy.position.y += core::entity_direction_to_vector(enemy.dir).y * Tank_Speed * delta_time;
+
+			std::int32_t start_x = std::int32_t((enemy.position.x - Tank_Size.x / 2.0f) * 2.0f);
+			std::int32_t start_y = std::int32_t((enemy.position.y - Tank_Size.y / 2.0f) * 2.0f);
+			std::int32_t end_x = std::int32_t((enemy.position.x + Tank_Size.x / 2.0f) * 2.0f);
+			std::int32_t end_y = std::int32_t((enemy.position.y + Tank_Size.y / 2.0f) * 2.0f);
+
+			if(enemy.dir == Entity_Direction::Right && (end_x >= 0 && end_x < Background_Tile_Count_X * 2)) {
+				for(std::int32_t y = start_y;y <= end_y;y += 1) {
+					if(y < 0 || y >= Background_Tile_Count_Y * 2) continue;
+					const auto& tile = tiles[y * (Background_Tile_Count_X * 2) + end_x];
+					if(tile.template_index == Invalid_Tile_Index) continue;
+
+					const auto& tile_template = tile_templates[tile.template_index];
+					if(tile_template.flag != Tile_Flag::Solid) continue;
+
+					enemy.position.x = end_x / 2.0f - Tank_Size.x / 2.0f - 0.001f;
+				}
+			}
+			if(enemy.dir == Entity_Direction::Down && (end_y >= 0 && end_y < Background_Tile_Count_Y * 2)) {
+				for(std::int32_t x = start_x;x <= end_x;x += 1) {
+					if(x < 0 || x >= Background_Tile_Count_X * 2) continue;
+					const auto& tile = tiles[end_y * (Background_Tile_Count_X * 2) + x];
+					if(tile.template_index == Invalid_Tile_Index) continue;
+
+					const auto& tile_template = tile_templates[tile.template_index];
+					if(tile_template.flag != Tile_Flag::Solid) continue;
+
+					enemy.position.y = end_y / 2.0f - Tank_Size.y / 2.0f - 0.001f;
+				}
+			}
+			if(enemy.dir == Entity_Direction::Left && (start_x >= 0 && start_x < Background_Tile_Count_X * 2)) {
+				for(std::int32_t y = start_y;y <= end_y;y += 1) {
+					if(y < 0 || y >= Background_Tile_Count_Y * 2) continue;
+					const auto& tile = tiles[y * (Background_Tile_Count_X * 2) + start_x];
+					if(tile.template_index == Invalid_Tile_Index) continue;
+
+					const auto& tile_template = tile_templates[tile.template_index];
+					if(tile_template.flag != Tile_Flag::Solid) continue;
+
+					enemy.position.x = start_x / 2.0f + Tank_Size.x + 0.001f;
+				}
+			}
+			if(enemy.dir == Entity_Direction::Up && (start_y >= 0 && start_y < Background_Tile_Count_Y * 2)) {
+				for(std::int32_t x = start_x;x <= end_x;x += 1) {
+					if(x < 0 || x >= Background_Tile_Count_X * 2) continue;
+					const auto& tile = tiles[start_y * (Background_Tile_Count_X * 2) + x];
+					if(tile.template_index == Invalid_Tile_Index) continue;
+
+					const auto& tile_template = tile_templates[tile.template_index];
+					if(tile_template.flag != Tile_Flag::Solid) continue;
+
+					enemy.position.y = start_y / 2.0f + Tank_Size.y + 0.001f;
+				}
+			}
 		}
-
 		std::erase_if(enemy_tanks,[](const Tank& tank) { return tank.destroyed; });
 	}
 
@@ -255,7 +324,7 @@ namespace core {
 					switch(current_main_menu_option) {
 						case 0: {
 							current_stage_index = 0;
-							player_lifes = 3;
+							player_lifes = 2;
 							scene = Scene::Intro_1player;
 							break;
 						}
@@ -335,6 +404,7 @@ namespace core {
 					remaining_enemy_count_to_spawn = 1;
 					enemy_spawn_timer = Enemy_Spawn_Time;
 					game_win_timer = 1.0f;
+					game_lose_timer = 1.0f;
 
 					scene = Scene::Game_1player;
 				}
@@ -702,8 +772,14 @@ namespace core {
 				auto rect = renderer->compute_text_dims({},{0.5f,0.5f},"You lost!");
 				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,3.0f},{0.5f,0.5f},{1,1,1},"You lost!");
 
-				rect = renderer->compute_text_dims({},{0.5f,0.5f},"The eagle has been destroyed.");
-				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},"The eagle has been destroyed.");
+				if(eagle.destroyed) {
+					rect = renderer->compute_text_dims({},{0.5f,0.5f},"The eagle has been destroyed.");
+					renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},"The eagle has been destroyed.");
+				}
+				else {
+					rect = renderer->compute_text_dims({},{0.5f,0.5f},"Your tank has been destroyed.");
+					renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},"Your tank has been destroyed.");
+				}
 
 				rect = renderer->compute_text_dims({},{0.5f,0.5f},"Press 'Enter' to return to the main menu.");
 				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.5f,0.5f},{1,1,1},"Press 'Enter' to return to the main menu.");
