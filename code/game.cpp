@@ -8,9 +8,12 @@
 #include "exceptions.hpp"
 
 namespace core {
-	static constexpr float Main_Menu_First_Option_Y_Offset = 6.0f;
+	static constexpr float Main_Menu_First_Option_Y_Offset = 7.0f;
 	static constexpr const char* Main_Menu_Options[] = {"1 player","2 players","Load Level","Construction","Quit"};
 	static constexpr std::size_t Main_Menu_Options_Count = sizeof(Main_Menu_Options) / sizeof(*Main_Menu_Options);
+	static constexpr float Map_First_Option_Y_Offset = 5.0f;
+	static constexpr const char* Map_Options[] = { "Level 1","Level 2","Level 3","Level 4","Level 5 " };
+	static constexpr std::size_t Map_Options_Count = sizeof(Map_Options) / sizeof(*Map_Options);
 	static constexpr float Tank_Speed = 4.0f;
 	static constexpr float Bullet_Speed = 12.0f;
 	static constexpr std::uint32_t Player_Tank_Sprite_Layer_Index = 0;
@@ -351,9 +354,10 @@ namespace core {
 		if(platform->was_key_pressed(Keycode::F3)) {
 			show_fps = !show_fps;
 		}
-
+		_sleep(1);
 		switch(scene) {
 			case Scene::Main_Menu: {
+				load_map("./map_menu.txt");
 				if(platform->was_key_pressed(Keycode::Down)) {
 					current_main_menu_option += 1;
 					if(current_main_menu_option >= Main_Menu_Options_Count) current_main_menu_option = 0;
@@ -403,32 +407,38 @@ namespace core {
 			}
 			case Scene::Intro_1player: {
 				update_timer += delta_time;
-				static constexpr float Intro_Screen_Duration = 0.0f;
-				if(update_timer >= Intro_Screen_Duration) {
+				static constexpr float Intro_Screen_Duration = 30.0f; 
+				if (platform->was_key_pressed(Keycode::Down)) {
+					current_map_option += 1;
+					if (current_map_option >= Main_Menu_Options_Count) current_map_option = 0;
+				}
+				if (platform->was_key_pressed(Keycode::Up)) {
+					if (current_map_option == 0) current_map_option = Main_Menu_Options_Count;
+					current_map_option -= 1;
+				}
+				switch (current_map_option) {
+					case 0: {
+						load_map("./map1.txt");
+						break;
+					}
+					case 1: {
+						load_map("./map2.txt");
+						break;
+					}
+					case 2: {
+						load_map("./map3.txt");
+						break;
+					}
+					case 3: {load_map("./map4.txt");
+						break;
+					}
+					case 4: {load_map("./map5.txt");
+						break;
+					}
+
+				}
+				if(update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
 					update_timer = 0.0f;
-					
-					for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
-						for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
-							tiles[y * (Background_Tile_Count_X * 2) + x] = Tile{Invalid_Tile_Index};
-						}
-					}
-					tiles[0 * (Background_Tile_Count_X * 2) + 0] = Tile{11};
-					tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + 0] = Tile{14};
-					tiles[0 * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{12};
-					tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{13};
-
-					for(std::uint32_t x = 1;x < Background_Tile_Count_X * 2 - 1;x += 1) {
-						tiles[0 * (Background_Tile_Count_X * 2) + x] = Tile{8};
-						tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + x] = Tile{10};
-					}
-					for(std::uint32_t y = 1;y < Background_Tile_Count_Y * 2 - 2;y += 1) {
-						tiles[y * (Background_Tile_Count_X * 2) + 0] = Tile{7};
-						tiles[y * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{9};
-					}
-
-					tiles[6 * (Background_Tile_Count_X * 2) + 8] = Tile{0};
-					tiles[6 * (Background_Tile_Count_X * 2) + 11] = Tile{0};
-
 					eagle.destroyed = false;
 					eagle.position = {Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f};
 					player_tank.destroyed = false;
@@ -817,9 +827,67 @@ namespace core {
 					Vec3 color = (current_main_menu_option == i) ? Vec3{1,1,0} : Vec3{1,1,1};
 					renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Main_Menu_First_Option_Y_Offset + float(i) * 0.5f,1},{0.25f,0.25f},color,Main_Menu_Options[i]);
 				}
+				if (!construction_choosing_tile) {
+					for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
+						for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
+							const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+							if (tile.template_index == Invalid_Tile_Index) continue;
+							const auto& tile_template = tile_templates[tile.template_index];
+
+							float z_order = 0.0f;
+							switch (tile_template.flag) {
+							case Tile_Flag::Above: z_order = 0.75f; break;
+							case Tile_Flag::Bulletpass:
+							case Tile_Flag::Below: z_order = 0.25f; break;
+							}
+							renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
+						}
+					}
+				}
 				break;
 			}
 			case Scene::Intro_1player: {
+				for (std::size_t i = 0; i < Map_Options_Count; i += 1) {
+					auto rect = renderer->compute_text_dims({ 0,0,1 }, { 0.25f,0.25f }, Map_Options[i]);
+					Vec3 color = (current_map_option == i) ? Vec3{1, 1, 0} : Vec3{ 1,1,1 };
+					renderer->draw_text({ Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Map_First_Option_Y_Offset + float(i) * 0.5f,1 }, { 0.25f,0.25f }, color, Map_Options[i]);
+				}
+				if (!construction_choosing_tile) {
+					for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
+						for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
+							const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+							if (tile.template_index == Invalid_Tile_Index) continue;
+							const auto& tile_template = tile_templates[tile.template_index];
+
+							float z_order = 0.0f;
+							switch (tile_template.flag) {
+							case Tile_Flag::Above: z_order = 0.75f; break;
+							case Tile_Flag::Bulletpass:
+							case Tile_Flag::Below: z_order = 0.25f; break;
+							}
+							renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
+						}
+					}
+				}
+				break;
+				for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
+					for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
+						const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+						if (tile.template_index == Invalid_Tile_Index) continue;
+						const auto& tile_template = tile_templates[tile.template_index];
+
+						float z_order = 0.0f;
+						switch (tile_template.flag) {
+						case Tile_Flag::Above: z_order = 0.75f; break;
+						case Tile_Flag::Bulletpass:
+						case Tile_Flag::Below: z_order = 0.25f; break;
+						}
+						renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
+					}
+				}
+
+				
+				renderer->draw_text({ 4,5,0 }, { 1.0f,1.0f }, { 1,1,0 }, "Choose a level");
 				break;
 			}
 			case Scene::Game_1player: {
