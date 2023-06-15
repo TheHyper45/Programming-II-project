@@ -919,7 +919,7 @@ namespace core {
 					renderer->draw_sprite({bullet.position.x,bullet.position.y},{1.0f,1.0f},core::entity_direction_to_rotation(bullet.dir),entity_sprites,Bullet_Sprite_Layer_Index);
 				}
 				for(auto& explosion : explosions) {
-					renderer->draw_sprite(explosion.position,explosion.size,0,explosion_sprite,explosion.sprite_index);
+					if(explosion.sprite_index != -1) renderer->draw_sprite(explosion.position,explosion.size,0,explosion_sprite,explosion.sprite_index);
 					explosion.sprite_index = 8 * explosion.texture_serie + (7 - (int)(explosion.timer * 8));
 					explosion.timer -= delta_time;
 					if(explosion.timer < 0) {
@@ -1002,7 +1002,7 @@ namespace core {
 							offset.y += 1.0f;
 						}
 					}
-					renderer->draw_sprite({1.5f + marker_offset.x,1.5f + marker_offset.y},{1.0f,1.0f},0,construction_place_marker,0);
+					renderer->draw_sprite({1.5f + marker_offset.x,1.5f + marker_offset.y},{1.0f,1.0f},0,construction_place_marker);
 					renderer->draw_text({0.125f,0.125f,1},{0.25f,0.25f},{1,1,1},"Choose a tile from the list below (or press 'Escape' or 'E' to cancel).");
 				}
 				break;
