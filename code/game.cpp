@@ -349,7 +349,7 @@ namespace core {
 							break;
 						}
 						case 2: {
-							platform->error_message_box("Level selection is not yet supported.");
+							scene = Scene::Level_Selection;
 							break;
 						}
 						case 3: {
@@ -560,6 +560,63 @@ namespace core {
 				}
 				break;
 			}
+			case Scene::Level_Selection: {
+				update_timer += delta_time;
+				static constexpr float Intro_Screen_Duration = 0.0f;
+				if (update_timer >= Intro_Screen_Duration) {
+					update_timer = 0.0f;
+
+					for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
+						for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
+							tiles[y * (Background_Tile_Count_X * 2) + x] = Tile{ Invalid_Tile_Index };
+						}
+						static constexpr float Intro_Screen_Duration = 30.0f;
+						if (platform->was_key_pressed(Keycode::Up)) {
+							current_map_option += 1;
+							if (current_map_option >= Main_Menu_Options_Count) current_map_option = 0;
+						}
+						if (platform->was_key_pressed(Keycode::Down)) {
+							if (current_map_option == 0) current_map_option = Main_Menu_Options_Count;
+							current_map_option -= 1;
+						}
+						switch (current_map_option) {
+						case 0: {
+							load_map("./assets/maps/map1.txt");
+							break;
+						}
+						case 1: {
+							load_map("./assets/maps/map2.txt");
+							break;
+						}
+						case 2: {
+							load_map("./assets/maps/map3.txt");
+							break;
+						}
+						case 3: {load_map("./assets/maps/map4.txt");
+							break;
+						}
+						case 4: {load_map("./assets/maps/map5.txt");
+							break;
+						}
+							  if (update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
+								  update_timer = 0.0f;
+								  eagle.destroyed = false;
+								  eagle.position = { Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f };
+								  player_tank.destroyed = false;
+								  player_tank.dir = Entity_Direction::Up;
+								  player_tank.position = eagle.position - Vec2{3.0f, 0.0f};
+								  player_lifes = 3;
+								  bullets.clear();
+								  enemy_tanks.clear();
+								  spawn_effects.clear();
+								  scene = Scene::Level_Selected;
+							  }
+						}
+					}
+				}
+				break;
+			}
+			case Scene::Level_Selected: {};
 			case Scene::Construction: {
 				auto mouse_pos = platform->mouse_position();
 				auto dims = renderer->render_client_rect_dimensions();
@@ -637,9 +694,6 @@ namespace core {
 					}
 					if(platform->was_key_pressed(Keycode::Escape) || platform->was_key_pressed(Keycode::E)) construction_choosing_tile = false;
 				}
-				break;
-			}
-			case Scene::Level_Selection: {
 				break;
 			}
 			case Scene::Victory_Screen:
@@ -734,6 +788,19 @@ namespace core {
 				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.5f,0.5f},{1,1,1},"Press 'Enter' to advance to the next stage.");
 				break;
 			}
+			case Scene::Level_Selection: {
+				render_map();
+				for (std::size_t i = 0; i < Map_Options_Count; i += 1) {
+					auto rect = renderer->compute_text_dims({ 0,0,1 }, { 0.25f,0.25f }, Map_Options[i]);
+					Vec3 color = (current_map_option == i) ? Vec3{1, 1, 0} : Vec3{ 1,1,1 };
+					renderer->draw_text({ Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Map_First_Option_Y_Offset + float(i) * 0.5f,1 }, { 0.25f,0.25f }, color, Map_Options[i]);
+				}
+				break; 
+			}
+			case Scene::Level_Selected: {
+				render_map();
+				break;
+				}
 			case Scene::Construction: {
 				if(!construction_choosing_tile) {
 					render_map();
@@ -762,9 +829,6 @@ namespace core {
 					renderer->draw_sprite({1.5f + marker_offset.x,1.5f + marker_offset.y},{1.0f,1.0f},0,construction_place_marker,0);
 					renderer->draw_text({0.125f,0.125f,1},{0.25f,0.25f},{1,1,1},"Choose a tile from the list below (or press 'Escape' or 'E' to cancel).");
 				}
-				break;
-			}
-			case Scene::Level_Selection: {
 				break;
 			}
 			case Scene::Game_Over: {
