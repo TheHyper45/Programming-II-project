@@ -42,7 +42,7 @@ namespace core {
 		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),
 		eagle(),game_lose_timer(),spawn_effects(),enemy_tanks(),player_respawn_timer(),random_engine(),enamy_spawn_point_random_dist(),
 		enemy_action_duration_dist(),chance_0_1_dist(),max_enemy_count_on_screen(),remaining_enemy_count_to_spawn(),enemy_spawn_timer(),game_win_timer(),current_stage_index() {
-		random_engine = std::mt19937_64(std::time(nullptr));
+		random_engine = std::minstd_rand0(std::time(nullptr));
 		enamy_spawn_point_random_dist = std::uniform_int_distribution<std::size_t>(0,Enemy_Spawner_Location_Count - 1);
 		enemy_action_duration_dist = std::uniform_real_distribution<float>(0.5f,3.0f);
 		chance_0_1_dist = std::uniform_real_distribution<float>(0.0f,1.0f);
@@ -119,6 +119,7 @@ namespace core {
 				player_tank.dir = Entity_Direction::Up;
 				player_tank.position = eagle.position - Vec2{3.0f,0.0f};
 				player_lifes -= 1;
+				player_invulnerability_timer = 5.0f;
 				add_spawn_effect(player_tank.position);
 			}
 			return;
@@ -131,6 +132,9 @@ namespace core {
 			}
 			return;
 		}
+
+		player_invulnerability_timer -= delta_time;
+		if(player_invulnerability_timer <= 0.0f) player_invulnerability_timer = 0.0f;
 
 		player_tank.shoot_cooldown -= delta_time;
 		if(player_tank.shoot_cooldown <= 0.0f) player_tank.shoot_cooldown = 0.0f;
@@ -164,10 +168,11 @@ namespace core {
 		player_tank.position.x += forward.x * Tank_Speed * delta_time;
 		player_tank.position.y += forward.y * Tank_Speed * delta_time;
 
-		std::int32_t start_x = std::int32_t((player_tank.position.x - Tank_Size.x / 2.0f + 0.05f) * 2.0f);
-		std::int32_t start_y = std::int32_t((player_tank.position.y - Tank_Size.y / 2.0f + 0.05f) * 2.0f);
-		std::int32_t end_x = std::int32_t((player_tank.position.x + Tank_Size.x / 2.0f - 0.05f) * 2.0f);
-		std::int32_t end_y = std::int32_t((player_tank.position.y + Tank_Size.y / 2.0f - 0.05f) * 2.0f);
+		//Collision detection code uses the fact that coords of an object can be used as indicies into the map array thus creating quite efficient way of check collsions with tiles.
+		std::int32_t start_x = std::int32_t((player_tank.position.x - Tank_Size.x / 2.0f + 0.1f) * 2.0f);
+		std::int32_t start_y = std::int32_t((player_tank.position.y - Tank_Size.y / 2.0f + 0.1f) * 2.0f);
+		std::int32_t end_x = std::int32_t((player_tank.position.x + Tank_Size.x / 2.0f - 0.1f) * 2.0f);
+		std::int32_t end_y = std::int32_t((player_tank.position.y + Tank_Size.y / 2.0f - 0.1f) * 2.0f);
 
 		if(player_tank.dir == Entity_Direction::Right && (end_x >= 0 && end_x < Background_Tile_Count_X * 2)) {
 			for(std::int32_t y = start_y;y <= end_y;y += 1) {
@@ -235,7 +240,7 @@ namespace core {
 
 				if(enemy_tanks.size() < max_enemy_count_on_screen) {
 					Tank enemy = {};
-					enemy.dir = Entity_Direction::Down;
+					enemy.dir = Entity_Direction::Up;
 					enemy.position = Enemy_Spawner_Locations[enamy_spawn_point_random_dist(random_engine)];
 					add_spawn_effect(enemy.position);
 					enemy_tanks.push_back(enemy);
@@ -244,26 +249,156 @@ namespace core {
 			}
 		}
 
+		Rect player_rect = {player_tank.position.x - Tank_Size.x / 2.0f,player_tank.position.y - Tank_Size.y / 2.0f,1.0f,1.0f};
+		Rect eagle_rect = {eagle.position.x - Eagle_Size.x / 2.0f,eagle.position.y - Eagle_Size.y / 2.0f,Eagle_Size.x,Eagle_Size.y};
 		for(auto& enemy : enemy_tanks) {
-			/*enemy.enemy_change_dir_timer -= delta_time;
-			if(enemy.enemy_change_dir_timer <= 0.0f) {
-				enemy.enemy_change_dir_timer = enemy_action_duration_dist(random_engine);
+			enemy.shoot_cooldown -= delta_time;
+			if(enemy.shoot_cooldown <= 0.0f) enemy.shoot_cooldown = 0.0f;
 
-				if(enemy.dir == Entity_Direction::Down || enemy.dir == Entity_Direction::Up) {
-					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Left : Entity_Direction::Right;
+			bool dir_change_could_happen = false;
+			enemy.ai_dir_change_timer += delta_time;
+			if(enemy.ai_dir_change_timer >= 0.5f) {
+				enemy.ai_dir_change_timer = 0.0f;
+				dir_change_could_happen = true;
+			}
+
+			Rect right_vision_rect = {enemy.position.x + Tank_Size.x / 2.0f,enemy.position.y - Tank_Size.y / 2.0f,16,1};
+			Rect down_vision_rect = {enemy.position.x - Tank_Size.x / 2.0f,enemy.position.y + Tank_Size.y / 2.0f,1,16};
+			Rect left_vision_rect = {enemy.position.x - Tank_Size.x / 2.0f - 16,enemy.position.y - Tank_Size.y / 2.0f,16,1};
+			Rect up_vision_rect = {enemy.position.x - Tank_Size.x / 2.0f,enemy.position.y - Tank_Size.y / 2.0f - 16,1,16};
+
+			if(enemy.dir == Entity_Direction::Right) {
+				if(dir_change_could_happen) {
+					bool did_happen = false;
+					if((down_vision_rect.overlaps(player_rect) || down_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Down;
+						did_happen = true;
+					}
+					else if((left_vision_rect.overlaps(player_rect) || left_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Left;
+						did_happen = true;
+					}
+					else if((up_vision_rect.overlaps(player_rect) || up_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Up;
+						did_happen = true;
+					}
+					if(did_happen) {
+						Bullet bullet{};
+						bullet.dir = enemy.dir;
+						bullet.position = enemy.position + Player_Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
+						bullets.push_back(bullet);
+						enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+					}
 				}
-				else if(enemy.dir == Entity_Direction::Left || enemy.dir == Entity_Direction::Right) {
-					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Down : Entity_Direction::Up;
+				else if(right_vision_rect.overlaps(player_rect) && enemy.shoot_cooldown <= 0.0f) {
+					Bullet bullet{};
+					bullet.dir = enemy.dir;
+					bullet.position = enemy.position + Player_Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
+					bullets.push_back(bullet);
+					enemy.shoot_cooldown = Tank_Shoot_Cooldown;
 				}
-			}*/
+			}
+			else if(enemy.dir == Entity_Direction::Down) {
+				if(dir_change_could_happen) {
+					bool did_happen = false;
+					if((right_vision_rect.overlaps(player_rect) || right_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Right;
+						did_happen = true;
+					}
+					else if((left_vision_rect.overlaps(player_rect) || left_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Left;
+						did_happen = true;
+					}
+					else if((up_vision_rect.overlaps(player_rect) || up_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Up;
+						did_happen = true;
+					}
+					if(did_happen) {
+						Bullet bullet{};
+						bullet.dir = enemy.dir;
+						bullet.position = enemy.position + Player_Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
+						bullets.push_back(bullet);
+						enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+					}
+				}
+				else if(down_vision_rect.overlaps(player_rect) && enemy.shoot_cooldown <= 0.0f) {
+					Bullet bullet{};
+					bullet.dir = enemy.dir;
+					bullet.position = enemy.position + Player_Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
+					bullets.push_back(bullet);
+					enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+				}
+			}
+			else if(enemy.dir == Entity_Direction::Left) {
+				if(dir_change_could_happen) {
+					bool did_happen = false;
+					if((right_vision_rect.overlaps(player_rect) || right_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Right;
+						did_happen = true;
+					}
+					else if((down_vision_rect.overlaps(player_rect) || down_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Down;
+						did_happen = true;
+					}
+					else if((up_vision_rect.overlaps(player_rect) || up_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Up;
+						did_happen = true;
+					}
+					if(did_happen) {
+						Bullet bullet{};
+						bullet.dir = enemy.dir;
+						bullet.position = enemy.position + Player_Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
+						bullets.push_back(bullet);
+						enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+					}
+				}
+				else if(left_vision_rect.overlaps(player_rect) && enemy.shoot_cooldown <= 0.0f) {
+					Bullet bullet{};
+					bullet.dir = enemy.dir;
+					bullet.position = enemy.position + Player_Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
+					bullets.push_back(bullet);
+					enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+				}
+			}
+			else if(enemy.dir == Entity_Direction::Up) {
+				if(dir_change_could_happen) {
+					bool did_happen = false;
+					if((right_vision_rect.overlaps(player_rect) || right_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Right;
+						did_happen = true;
+					}
+					else if((down_vision_rect.overlaps(player_rect) || down_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Down;
+						did_happen = true;
+					}
+					else if((left_vision_rect.overlaps(player_rect) || left_vision_rect.overlaps(eagle_rect)) && chance_0_1_dist(random_engine) < 0.25f) {
+						enemy.dir = Entity_Direction::Left;
+						did_happen = true;
+					}
+					if(did_happen) {
+						Bullet bullet{};
+						bullet.dir = enemy.dir;
+						bullet.position = enemy.position + Player_Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
+						bullets.push_back(bullet);
+						enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+					}
+				}
+				else if(up_vision_rect.overlaps(player_rect) && enemy.shoot_cooldown <= 0.0f) {
+					Bullet bullet{};
+					bullet.dir = enemy.dir;
+					bullet.position = enemy.position + Player_Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
+					bullets.push_back(bullet);
+					enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+				}
+			}
 
 			enemy.position.x += core::entity_direction_to_vector(enemy.dir).x * Tank_Speed * delta_time;
 			enemy.position.y += core::entity_direction_to_vector(enemy.dir).y * Tank_Speed * delta_time;
 
-			std::int32_t start_x = std::int32_t((enemy.position.x - Tank_Size.x / 2.0f + 0.05f) * 2.0f);
-			std::int32_t start_y = std::int32_t((enemy.position.y - Tank_Size.y / 2.0f + 0.05f) * 2.0f);
-			std::int32_t end_x = std::int32_t((enemy.position.x + Tank_Size.x / 2.0f - 0.05f) * 2.0f);
-			std::int32_t end_y = std::int32_t((enemy.position.y + Tank_Size.y / 2.0f - 0.05f) * 2.0f);
+			std::int32_t start_x = std::int32_t((enemy.position.x - Tank_Size.x / 2.0f + 0.1f) * 2.0f);
+			std::int32_t start_y = std::int32_t((enemy.position.y - Tank_Size.y / 2.0f + 0.1f) * 2.0f);
+			std::int32_t end_x = std::int32_t((enemy.position.x + Tank_Size.x / 2.0f - 0.1f) * 2.0f);
+			std::int32_t end_y = std::int32_t((enemy.position.y + Tank_Size.y / 2.0f - 0.1f) * 2.0f);
 
 			if(enemy.dir == Entity_Direction::Right && (end_x >= 0 && end_x < Background_Tile_Count_X * 2)) {
 				for(std::int32_t y = start_y;y <= end_y;y += 1) {
@@ -278,7 +413,7 @@ namespace core {
 					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Down : Entity_Direction::Up;
 				}
 			}
-			if(enemy.dir == Entity_Direction::Down && (end_y >= 0 && end_y < Background_Tile_Count_Y * 2)) {
+			else if(enemy.dir == Entity_Direction::Down && (end_y >= 0 && end_y < Background_Tile_Count_Y * 2)) {
 				for(std::int32_t x = start_x;x <= end_x;x += 1) {
 					if(x < 0 || x >= Background_Tile_Count_X * 2) continue;
 					const auto& tile = tiles[end_y * (Background_Tile_Count_X * 2) + x];
@@ -291,7 +426,7 @@ namespace core {
 					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Left : Entity_Direction::Right;
 				}
 			}
-			if(enemy.dir == Entity_Direction::Left && (start_x >= 0 && start_x < Background_Tile_Count_X * 2)) {
+			else if(enemy.dir == Entity_Direction::Left && (start_x >= 0 && start_x < Background_Tile_Count_X * 2)) {
 				for(std::int32_t y = start_y;y <= end_y;y += 1) {
 					if(y < 0 || y >= Background_Tile_Count_Y * 2) continue;
 					const auto& tile = tiles[y * (Background_Tile_Count_X * 2) + start_x];
@@ -304,7 +439,7 @@ namespace core {
 					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Down : Entity_Direction::Up;
 				}
 			}
-			if(enemy.dir == Entity_Direction::Up && (start_y >= 0 && start_y < Background_Tile_Count_Y * 2)) {
+			else if(enemy.dir == Entity_Direction::Up && (start_y >= 0 && start_y < Background_Tile_Count_Y * 2)) {
 				for(std::int32_t x = start_x;x <= end_x;x += 1) {
 					if(x < 0 || x >= Background_Tile_Count_X * 2) continue;
 					const auto& tile = tiles[start_y * (Background_Tile_Count_X * 2) + x];
@@ -340,7 +475,7 @@ namespace core {
 					switch(current_main_menu_option) {
 						case 0: {
 							current_stage_index = 0;
-							player_lifes = 2;
+							player_lifes = 3;
 							scene = Scene::Intro_1player;
 							break;
 						}
@@ -406,8 +541,8 @@ namespace core {
 					spawn_effects.clear();
 					explosions.clear();
 
-					max_enemy_count_on_screen = 4;
-					remaining_enemy_count_to_spawn = 1;
+					max_enemy_count_on_screen = 3;
+					remaining_enemy_count_to_spawn = 12;
 					enemy_spawn_timer = Enemy_Spawn_Time;
 					game_win_timer = 1.0f;
 					game_lose_timer = 1.0f;
@@ -444,12 +579,15 @@ namespace core {
 					}
 
 					Rect player_rect = {player_tank.position.x - Tank_Size.x / 2.0f,player_tank.position.y - Tank_Size.y / 2.0f,1.0f,1.0f};
-					if(bullet_rect.overlaps(player_rect) && !bullet.fired_by_player) {
-						add_explosion(player_tank.position,delta_time);
-						player_tank.destroyed = true;
-						bullet.destroyed = true;
-						static constexpr float Player_Respawn_Time = 2.0f;
-						player_respawn_timer = Player_Respawn_Time;
+					if(!player_tank.destroyed && bullet_rect.overlaps(player_rect) && !bullet.fired_by_player) {
+						if(player_invulnerability_timer <= 0.0f) {
+							add_explosion(player_tank.position,delta_time);
+							player_tank.destroyed = true;
+							bullet.destroyed = true;
+							static constexpr float Player_Respawn_Time = 2.0f;
+							player_respawn_timer = Player_Respawn_Time;
+						}
+						else add_explosion(player_tank.position,delta_time);
 						continue;
 					}
 
@@ -591,19 +729,39 @@ namespace core {
 							load_map("./assets/maps/map_menu.txt");
 							scene = Scene::Main_Menu;
 						}
-						if(platform->was_key_pressed(Keycode::S)) save_map("./assets/_map.txt");
-						if(platform->was_key_pressed(Keycode::L)) load_map("./assets/_map.txt");
+						if(platform->was_key_pressed(Keycode::S)) {
+							try {
+								save_map("./_map.txt");
+							}
+							catch(const File_Open_Exception& except) {
+								char buffer[1024] = {};
+								std::snprintf(buffer,sizeof(buffer) - 1,"Couldn't open file \"%s\".",except.file_path());
+								platform->error_message_box(buffer);
+							}
+							catch(...) { throw; }
+						}
+						if(platform->was_key_pressed(Keycode::L)) {
+							try {
+								load_map("./_map.txt");
+							}
+							catch(const File_Open_Exception& except) {
+								char buffer[1024] = {};
+								std::snprintf(buffer,sizeof(buffer) - 1,"Couldn't open file \"%s\".",except.file_path());
+								platform->error_message_box(buffer);
+							}
+							catch(...) { throw; }
+						}
 						if(platform->was_key_pressed(Keycode::B)) {
 							tiles[0 * (Background_Tile_Count_X * 2) + 0] = Tile{11,std::uint32_t(-1)};
-							tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + 0] = Tile{14,std::uint32_t(-1)};
+							tiles[(Background_Tile_Count_Y * 2 - 1) * (Background_Tile_Count_X * 2) + 0] = Tile{14,std::uint32_t(-1)};
 							tiles[0 * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{12,std::uint32_t(-1)};
-							tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{13,std::uint32_t(-1)};
+							tiles[(Background_Tile_Count_Y * 2 - 1) * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{13,std::uint32_t(-1)};
 
 							for(std::uint32_t x = 1;x < Background_Tile_Count_X * 2 - 1;x += 1) {
 								tiles[0 * (Background_Tile_Count_X * 2) + x] = Tile{8,std::uint32_t(-1)};
-								tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + x] = Tile{10,std::uint32_t(-1)};
+								tiles[(Background_Tile_Count_Y * 2 - 1) * (Background_Tile_Count_X * 2) + x] = Tile{10,std::uint32_t(-1)};
 							}
-							for(std::uint32_t y = 1;y < Background_Tile_Count_Y * 2 - 2;y += 1) {
+							for(std::uint32_t y = 1;y < Background_Tile_Count_Y * 2 - 1;y += 1) {
 								tiles[y * (Background_Tile_Count_X * 2) + 0] = Tile{7,std::uint32_t(-1)};
 								tiles[y * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{9,std::uint32_t(-1)};
 							}
@@ -707,6 +865,9 @@ namespace core {
 				}
 				if(!player_tank.destroyed) {
 					renderer->draw_sprite({player_tank.position.x,player_tank.position.y,0.5f},Tank_Size,core::entity_direction_to_rotation(player_tank.dir),entity_sprites,Player_Tank_Sprite_Layer_Index);
+					if(player_invulnerability_timer > 0.0f) {
+						renderer->draw_sprite({player_tank.position.x,player_tank.position.y,0.5f},Tank_Size,core::entity_direction_to_rotation(player_tank.dir),construction_place_marker);
+					}
 				}
 				for(const auto& enemy_tank : enemy_tanks) {
 					renderer->draw_sprite({enemy_tank.position.x,enemy_tank.position.y,0.5f},Tank_Size,core::entity_direction_to_rotation(enemy_tank.dir),entity_sprites,Enemy_Tank_Sprite_Layer_Index);
