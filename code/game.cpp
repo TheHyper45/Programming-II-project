@@ -12,7 +12,7 @@ namespace core {
 	static constexpr const char* Main_Menu_Options[] = {"1 player","2 players","Load Level","Construction","Quit"};
 	static constexpr std::size_t Main_Menu_Options_Count = sizeof(Main_Menu_Options) / sizeof(*Main_Menu_Options);
 	static constexpr float Map_First_Option_Y_Offset = 5.0f;
-	static constexpr const char* Map_Options[] = { "Level 1","Level 2","Level 3","Level 4","Level 5 " };
+	static constexpr const char* Map_Options[] = {"Level 1","Level 2","Level 3","Level 4","Level 5 "};
 	static constexpr std::size_t Map_Options_Count = sizeof(Map_Options) / sizeof(*Map_Options);
 	static constexpr float Tank_Speed = 4.0f;
 	static constexpr float Bullet_Speed = 12.0f;
@@ -35,12 +35,12 @@ namespace core {
 	static constexpr Rect Bullet_Bounding_Boxes[] = {{0.28125f,0.4375f,0.40625f,0.1875f},{0.4375f,0.28125f,0.1875f,0.40625f},{0.3125f,0.40625f,0.40625f,0.1875f},{0.4375f,0.3125f,0.1875f,0.40625f}};
 
 	static constexpr Vec2 Player_Tank_Bullet_Firing_Positions[] = {{0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f}};
-	static constexpr Vec2 Second_Player_Tank_Bullet_Firing_Positions[] = { {0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f} };
+	static constexpr Vec2 Second_Player_Tank_Bullet_Firing_Positions[] = {{0.7f,0.0f},{0.0f,0.7f},{-0.7f,0.0f},{0.0f,-0.7f}};
 
 	Game::Game(Renderer* _renderer,Platform* _platform) : renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),
 		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
 		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),
-		eagle(),game_lose_timer(),spawn_effects(),enemy_tanks(),player_respawn_timer(),random_engine(),enamy_spawn_point_random_dist(),
+		eagle(),game_lose_timer(),spawn_effects(),player_shoot_cooldown(),enemy_tanks(),player_respawn_timer(),random_engine(),enamy_spawn_point_random_dist(),
 		enemy_action_duration_dist(),max_enemy_count_on_screen(),remaining_enemy_count_to_spawn(),enemy_spawn_timer(),game_win_timer(),current_stage_index() {
 		random_engine = std::mt19937_64(std::time(nullptr));
 		enamy_spawn_point_random_dist = std::uniform_int_distribution<std::size_t>(0,Enemy_Spawner_Location_Count - 1);
@@ -50,7 +50,7 @@ namespace core {
 		construction_place_marker = renderer->sprite("./assets/marker.bmp");
 		entity_sprites = renderer->sprite_atlas("./assets/entities_32x32.bmp",32);
 		spawn_effect_sprite_atlas = renderer->sprite_atlas("./assets/spawn_effect_32x32.bmp",32);
-		explosion_sprite = renderer->sprite_atlas("./assets/explosions_16x16.bmp", 16);
+		explosion_sprite = renderer->sprite_atlas("./assets/explosions_16x16.bmp",16);
 
 		{
 			static constexpr const char* Tiles_Info_File_Path = "./assets/tiles_16x16.txt";
@@ -106,6 +106,7 @@ namespace core {
 				tile_templates.push_back(tile_template);
 			}
 		}
+		load_map("./assets/maps/map_menu.txt");
 	}
 
 	void Game::update_player(float delta_time) {
@@ -162,10 +163,10 @@ namespace core {
 		player_tank.position.x += forward.x * Tank_Speed * delta_time;
 		player_tank.position.y += forward.y * Tank_Speed * delta_time;
 
-		std::int32_t start_x = std::int32_t((player_tank.position.x - Tank_Size.x / 2.0f) * 2.0f);
-		std::int32_t start_y = std::int32_t((player_tank.position.y - Tank_Size.y / 2.0f) * 2.0f);
-		std::int32_t end_x = std::int32_t((player_tank.position.x + Tank_Size.x / 2.0f) * 2.0f);
-		std::int32_t end_y = std::int32_t((player_tank.position.y + Tank_Size.y / 2.0f) * 2.0f);
+		std::int32_t start_x = std::int32_t((player_tank.position.x - Tank_Size.x / 2.0f + 0.05f) * 2.0f);
+		std::int32_t start_y = std::int32_t((player_tank.position.y - Tank_Size.y / 2.0f + 0.05f) * 2.0f);
+		std::int32_t end_x = std::int32_t((player_tank.position.x + Tank_Size.x / 2.0f - 0.05f) * 2.0f);
+		std::int32_t end_y = std::int32_t((player_tank.position.y + Tank_Size.y / 2.0f - 0.05f) * 2.0f);
 
 		if(player_tank.dir == Entity_Direction::Right && (end_x >= 0 && end_x < Background_Tile_Count_X * 2)) {
 			for(std::int32_t y = start_y;y <= end_y;y += 1) {
@@ -251,10 +252,10 @@ namespace core {
 			enemy.position.x += core::entity_direction_to_vector(enemy.dir).x * Tank_Speed * delta_time;
 			enemy.position.y += core::entity_direction_to_vector(enemy.dir).y * Tank_Speed * delta_time;
 
-			std::int32_t start_x = std::int32_t((enemy.position.x - Tank_Size.x / 2.0f) * 2.0f);
-			std::int32_t start_y = std::int32_t((enemy.position.y - Tank_Size.y / 2.0f) * 2.0f);
-			std::int32_t end_x = std::int32_t((enemy.position.x + Tank_Size.x / 2.0f) * 2.0f);
-			std::int32_t end_y = std::int32_t((enemy.position.y + Tank_Size.y / 2.0f) * 2.0f);
+			std::int32_t start_x = std::int32_t((enemy.position.x - Tank_Size.x / 2.0f + 0.05f) * 2.0f);
+			std::int32_t start_y = std::int32_t((enemy.position.y - Tank_Size.y / 2.0f + 0.05f) * 2.0f);
+			std::int32_t end_x = std::int32_t((enemy.position.x + Tank_Size.x / 2.0f - 0.05f) * 2.0f);
+			std::int32_t end_y = std::int32_t((enemy.position.y + Tank_Size.y / 2.0f - 0.05f) * 2.0f);
 
 			if(enemy.dir == Entity_Direction::Right && (end_x >= 0 && end_x < Background_Tile_Count_X * 2)) {
 				for(std::int32_t y = start_y;y <= end_y;y += 1) {
@@ -312,10 +313,9 @@ namespace core {
 		if(platform->was_key_pressed(Keycode::F3)) {
 			show_fps = !show_fps;
 		}
-		_sleep(1);
+
 		switch(scene) {
 			case Scene::Main_Menu: {
-				load_map("./map_menu.txt");
 				if(platform->was_key_pressed(Keycode::Down)) {
 					current_main_menu_option += 1;
 					if(current_main_menu_option >= Main_Menu_Options_Count) current_main_menu_option = 0;
@@ -367,68 +367,23 @@ namespace core {
 				break;
 			}
 			case Scene::Intro_1player: {
+				if(current_stage_index >= 5) {
+					scene = Scene::Victory_Screen;
+					break;
+				}
+
 				update_timer += delta_time;
-<<<<<<< HEAD
 				static constexpr float Intro_Screen_Duration = 2.5f;
 				if(update_timer >= Intro_Screen_Duration) {
 					update_timer = 0.0f;
-					
-					for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
-						for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
-							tiles[y * (Background_Tile_Count_X * 2) + x] = Tile{Invalid_Tile_Index};
-						}
-					}
-					tiles[0 * (Background_Tile_Count_X * 2) + 0] = Tile{11,std::uint32_t(-1)};
-					tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + 0] = Tile{14,std::uint32_t(-1)};
-					tiles[0 * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{12,std::uint32_t(-1)};
-					tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{13,std::uint32_t(-1)};
-
-					for(std::uint32_t x = 1;x < Background_Tile_Count_X * 2 - 1;x += 1) {
-						tiles[0 * (Background_Tile_Count_X * 2) + x] = Tile{8,std::uint32_t(-1)};
-						tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + x] = Tile{10,std::uint32_t(-1)};
-					}
-					for(std::uint32_t y = 1;y < Background_Tile_Count_Y * 2 - 2;y += 1) {
-						tiles[y * (Background_Tile_Count_X * 2) + 0] = Tile{7,std::uint32_t(-1)};
-						tiles[y * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{9,std::uint32_t(-1)};
+					switch(current_stage_index) {
+						case 0: load_map("./assets/maps/map1.txt"); break;
+						case 1: load_map("./assets/maps/map2.txt"); break;
+						case 2: load_map("./assets/maps/map3.txt"); break;
+						case 3: load_map("./assets/maps/map4.txt"); break;
+						case 4: load_map("./assets/maps/map5.txt"); break;
 					}
 
-					tiles[6 * (Background_Tile_Count_X * 2) + 8] = Tile{0};
-					tiles[6 * (Background_Tile_Count_X * 2) + 11] = Tile{0};
-
-=======
-				static constexpr float Intro_Screen_Duration = 30.0f; 
-				if (platform->was_key_pressed(Keycode::Down)) {
-					current_map_option += 1;
-					if (current_map_option >= Main_Menu_Options_Count) current_map_option = 0;
-				}
-				if (platform->was_key_pressed(Keycode::Up)) {
-					if (current_map_option == 0) current_map_option = Main_Menu_Options_Count;
-					current_map_option -= 1;
-				}
-				switch (current_map_option) {
-					case 0: {
-						load_map("./map1.txt");
-						break;
-					}
-					case 1: {
-						load_map("./map2.txt");
-						break;
-					}
-					case 2: {
-						load_map("./map3.txt");
-						break;
-					}
-					case 3: {load_map("./map4.txt");
-						break;
-					}
-					case 4: {load_map("./map5.txt");
-						break;
-					}
-
-				}
-				if(update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
-					update_timer = 0.0f;
->>>>>>> db187fc3be60c08bbc206f16d010c99421922064
 					eagle.destroyed = false;
 					eagle.position = {Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f};
 					player_tank.destroyed = false;
@@ -496,7 +451,7 @@ namespace core {
 						}
 					}
 					if(bullet.destroyed) continue;
-					
+
 					std::int32_t start_x = std::int32_t((bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x) * 2.0f);
 					std::int32_t start_y = std::int32_t((bullet.position.y - Bullet_Size.y / 2.0f + relative_bounding_box.y) * 2.0f);
 					std::int32_t end_x = std::int32_t((bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x + relative_bounding_box.width) * 2.0f);
@@ -620,9 +575,27 @@ namespace core {
 							construction_current_tile_template_index = tile.template_index;
 						}
 						if(platform->was_key_pressed(Keycode::E)) construction_choosing_tile = true;
-						if(platform->was_key_pressed(Keycode::Escape)) scene = Scene::Main_Menu;
+						if(platform->was_key_pressed(Keycode::Escape)) {
+							load_map("./assets/maps/map_menu.txt");
+							scene = Scene::Main_Menu;
+						}
 						if(platform->was_key_pressed(Keycode::S)) save_map("./map.txt");
 						if(platform->was_key_pressed(Keycode::L)) load_map("./map.txt");
+						if(platform->was_key_pressed(Keycode::B)) {
+							tiles[0 * (Background_Tile_Count_X * 2) + 0] = Tile{11,std::uint32_t(-1)};
+							tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + 0] = Tile{14,std::uint32_t(-1)};
+							tiles[0 * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{12,std::uint32_t(-1)};
+							tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{13,std::uint32_t(-1)};
+
+							for(std::uint32_t x = 1;x < Background_Tile_Count_X * 2 - 1;x += 1) {
+								tiles[0 * (Background_Tile_Count_X * 2) + x] = Tile{8,std::uint32_t(-1)};
+								tiles[(Background_Tile_Count_Y * 2 - 2) * (Background_Tile_Count_X * 2) + x] = Tile{10,std::uint32_t(-1)};
+							}
+							for(std::uint32_t y = 1;y < Background_Tile_Count_Y * 2 - 2;y += 1) {
+								tiles[y * (Background_Tile_Count_X * 2) + 0] = Tile{7,std::uint32_t(-1)};
+								tiles[y * (Background_Tile_Count_X * 2) + (Background_Tile_Count_X * 2 - 1)] = Tile{9,std::uint32_t(-1)};
+							}
+						}
 					}
 				}
 				else {
@@ -657,8 +630,12 @@ namespace core {
 			case Scene::Level_Selection: {
 				break;
 			}
+			case Scene::Victory_Screen:
 			case Scene::Game_Over: {
-				if(platform->was_key_pressed(Keycode::Return)) scene = Scene::Main_Menu;
+				if(platform->was_key_pressed(Keycode::Return)) {
+					load_map("./assets/maps/map_menu.txt");
+					scene = Scene::Main_Menu;
+				}
 				break;
 			}
 		}
@@ -672,32 +649,15 @@ namespace core {
 		}
 		switch(scene) {
 			case Scene::Main_Menu: {
+				render_map();
 				for(std::size_t i = 0;i < Main_Menu_Options_Count;i += 1) {
 					auto rect = renderer->compute_text_dims({0,0,1},{0.25f,0.25f},Main_Menu_Options[i]);
 					Vec3 color = (current_main_menu_option == i) ? Vec3{1,1,0} : Vec3{1,1,1};
 					renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Main_Menu_First_Option_Y_Offset + float(i) * 0.5f,1},{0.25f,0.25f},color,Main_Menu_Options[i]);
 				}
-				if (!construction_choosing_tile) {
-					for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
-						for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
-							const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
-							if (tile.template_index == Invalid_Tile_Index) continue;
-							const auto& tile_template = tile_templates[tile.template_index];
-
-							float z_order = 0.0f;
-							switch (tile_template.flag) {
-							case Tile_Flag::Above: z_order = 0.75f; break;
-							case Tile_Flag::Bulletpass:
-							case Tile_Flag::Below: z_order = 0.25f; break;
-							}
-							renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
-						}
-					}
-				}
 				break;
 			}
 			case Scene::Intro_1player: {
-<<<<<<< HEAD
 				char buffer[32] = {};
 				int count = std::snprintf(buffer,sizeof(buffer) - 1,"Stage %zu",current_stage_index + 1);
 				if(count < 0) throw Runtime_Exception("Couldn't create intro's text.");
@@ -712,81 +672,23 @@ namespace core {
 				renderer->draw_text({Background_Tile_Count_X / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},buffer);
 
 				renderer->draw_sprite({Background_Tile_Count_X / 2.0f - 0.75f,5.0f},{1.0f,1.0f},0.0f,entity_sprites,Player_Tank_Sprite_Layer_Index);
-=======
-				for (std::size_t i = 0; i < Map_Options_Count; i += 1) {
-					auto rect = renderer->compute_text_dims({ 0,0,1 }, { 0.25f,0.25f }, Map_Options[i]);
-					Vec3 color = (current_map_option == i) ? Vec3{1, 1, 0} : Vec3{ 1,1,1 };
-					renderer->draw_text({ Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Map_First_Option_Y_Offset + float(i) * 0.5f,1 }, { 0.25f,0.25f }, color, Map_Options[i]);
-				}
-				if (!construction_choosing_tile) {
-					for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
-						for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
-							const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
-							if (tile.template_index == Invalid_Tile_Index) continue;
-							const auto& tile_template = tile_templates[tile.template_index];
-
-							float z_order = 0.0f;
-							switch (tile_template.flag) {
-							case Tile_Flag::Above: z_order = 0.75f; break;
-							case Tile_Flag::Bulletpass:
-							case Tile_Flag::Below: z_order = 0.25f; break;
-							}
-							renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
-						}
-					}
-				}
-				break;
-				for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
-					for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
-						const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
-						if (tile.template_index == Invalid_Tile_Index) continue;
-						const auto& tile_template = tile_templates[tile.template_index];
-
-						float z_order = 0.0f;
-						switch (tile_template.flag) {
-						case Tile_Flag::Above: z_order = 0.75f; break;
-						case Tile_Flag::Bulletpass:
-						case Tile_Flag::Below: z_order = 0.25f; break;
-						}
-						renderer->draw_sprite({ 0.25f + x * 0.5f,0.25f + y * 0.5f,z_order }, { 0.5f,0.5f }, tile_template.rotation, tiles_texture, tile_template.tile_layer_index);
-					}
-				}
-
-				
-				renderer->draw_text({ 4,5,0 }, { 1.0f,1.0f }, { 1,1,0 }, "Choose a level");
->>>>>>> db187fc3be60c08bbc206f16d010c99421922064
 				break;
 			}
 			case Scene::Game_1player: {
-				for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
-					for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
-						const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
-						if(tile.template_index == Invalid_Tile_Index) continue;
-						const auto& tile_template = tile_templates[tile.template_index];
-
-						float z_order = 0.0f;
-						switch(tile_template.flag) {
-							case Tile_Flag::Above: z_order = 0.75f; break;
-							case Tile_Flag::Bulletpass:
-							case Tile_Flag::Below: z_order = 0.25f; break;
-						}
-						renderer->draw_sprite({0.25f + x * 0.5f,0.25f + y * 0.5f,z_order},{0.5f,0.5f},tile_template.rotation,tiles_texture,tile_template.tile_layer_index);
-					}
-				}
-
+				render_map();
 				for(const auto& bullet : bullets) {
 					renderer->draw_sprite({bullet.position.x,bullet.position.y},{1.0f,1.0f},core::entity_direction_to_rotation(bullet.dir),entity_sprites,Bullet_Sprite_Layer_Index);
 				}
 				for(auto& explosion : explosions) {
-					renderer->draw_sprite(explosion.position, explosion.size, 0, explosion_sprite, explosion.sprite_index);
-					explosion.sprite_index = 8*explosion.texture_serie+(7 - (int)(explosion.timer * 8));
+					renderer->draw_sprite(explosion.position,explosion.size,0,explosion_sprite,explosion.sprite_index);
+					explosion.sprite_index = 8 * explosion.texture_serie + (7 - (int)(explosion.timer * 8));
 					explosion.timer -= delta_time;
-					if (explosion.timer < 0) {
+					if(explosion.timer < 0) {
 						explosion.destroyed = 1;
 					}
 				}
 
-				std::erase_if(explosions, [](const Explosion& explosion) { return explosion.destroyed; });
+				std::erase_if(explosions,[](const Explosion& explosion) { return explosion.destroyed; });
 
 				if(!eagle.destroyed) {
 					renderer->draw_sprite({eagle.position.x,eagle.position.y,0.5f},Eagle_Size,0.0f,entity_sprites,Eagle_Sprite_Layer_Index);
@@ -822,22 +724,7 @@ namespace core {
 			}
 			case Scene::Construction: {
 				if(!construction_choosing_tile) {
-					for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
-						for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
-							const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
-							if(tile.template_index == Invalid_Tile_Index) continue;
-							const auto& tile_template = tile_templates[tile.template_index];
-
-							float z_order = 0.0f;
-							switch(tile_template.flag) {
-								case Tile_Flag::Above: z_order = 0.75f; break;
-								case Tile_Flag::Bulletpass:
-								case Tile_Flag::Below: z_order = 0.25f; break;
-							}
-							renderer->draw_sprite({0.25f + x * 0.5f,0.25f + y * 0.5f,z_order},{0.5f,0.5f},tile_template.rotation,tiles_texture,tile_template.tile_layer_index);
-						}
-					}
-
+					render_map();
 					for(const auto& pos : Enemy_Spawner_Locations) {
 						renderer->draw_sprite({pos.x,pos.y,0.9f},{1.0f,1.0f},0.0f,spawn_effect_sprite_atlas,3);
 					}
@@ -880,6 +767,17 @@ namespace core {
 					rect = renderer->compute_text_dims({},{0.5f,0.5f},"Your tank has been destroyed.");
 					renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},"Your tank has been destroyed.");
 				}
+
+				rect = renderer->compute_text_dims({},{0.5f,0.5f},"Press 'Enter' to return to the main menu.");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.5f,0.5f},{1,1,1},"Press 'Enter' to return to the main menu.");
+				break;
+			}
+			case Scene::Victory_Screen: {
+				auto rect = renderer->compute_text_dims({},{0.5f,0.5f},"You have beaten the game!!!");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,3.0f},{0.5f,0.5f},{1,1,1},"You have beaten the game!!!");
+
+				rect = renderer->compute_text_dims({},{0.5f,0.5f},"Thank you for playing!");
+				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,5.0f},{0.5f,0.5f},{1,1,1},"Thank you for playing!");
 
 				rect = renderer->compute_text_dims({},{0.5f,0.5f},"Press 'Enter' to return to the main menu.");
 				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.5f,0.5f},{1,1,1},"Press 'Enter' to return to the main menu.");
@@ -931,6 +829,17 @@ namespace core {
 			for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
 				auto& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
 				file >> tile.template_index >> tile.health;
+			}
+		}
+	}
+
+	void Game::render_map() {
+		for(std::uint32_t y = 0;y < Background_Tile_Count_Y * 2;y += 1) {
+			for(std::uint32_t x = 0;x < Background_Tile_Count_X * 2;x += 1) {
+				const Tile& tile = tiles[y * (Background_Tile_Count_X * 2) + x];
+				if(tile.template_index == Invalid_Tile_Index) continue;
+				const auto& tile_template = tile_templates[tile.template_index];
+				renderer->draw_sprite({0.25f + x * 0.5f,0.25f + y * 0.5f,core::tile_flag_to_z_order(tile_template.flag)},{0.5f,0.5f},tile_template.rotation,tiles_texture,tile_template.tile_layer_index);
 			}
 		}
 	}

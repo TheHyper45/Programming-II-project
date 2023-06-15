@@ -16,7 +16,8 @@ namespace core {
 		Outro_1player,
 		Construction,
 		Level_Selection,
-		Game_Over
+		Game_Over,
+		Victory_Screen
 	};
 
 	enum struct Tile_Flag {
@@ -25,6 +26,15 @@ namespace core {
 		Above,
 		Bulletpass
 	};
+	[[nodiscard]] inline float tile_flag_to_z_order(Tile_Flag flag) {
+		switch(flag) {
+			case Tile_Flag::Above: return 0.75f;
+			case Tile_Flag::Bulletpass:
+			case Tile_Flag::Below: return -0.25f;
+			default: return 0.0f;
+		}
+	}
+
 	struct Tile_Template {
 		std::uint32_t tile_layer_index;
 		std::uint32_t health;
@@ -102,6 +112,7 @@ namespace core {
 		void add_explosion(Vec2 position,float delta_time);
 		void save_map(const char* file_path);
 		void load_map(const char* file_path);
+		void render_map();
 		static inline constexpr std::uint32_t Invalid_Tile_Index = std::uint32_t(-1);
 
 		Renderer* renderer;
