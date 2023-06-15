@@ -564,6 +564,13 @@ namespace core {
 				for(auto& bullet : bullets) {
 					bullet.position += core::entity_direction_to_vector(bullet.dir) * Bullet_Speed * delta_time;
 					const auto& relative_bounding_box = Bullet_Bounding_Boxes[std::size_t(bullet.dir)];
+					for (auto& bullet2 : bullets) {
+						if (bullet.position.x != bullet2.position.x && bullet.position.y != bullet2.position.y &&
+							(bullet.position.x - bullet2.position.x) * (bullet.position.x - bullet2.position.x) + (bullet.position.y - bullet2.position.y) * (bullet.position.y - bullet2.position.y) < 0.3f) {
+							bullet.destroyed = 1;
+							add_explosion(bullet.position, delta_time);
+						}
+					}
 
 					Rect bullet_rect = {
 						bullet.position.x - Bullet_Size.x / 2.0f + relative_bounding_box.x,
