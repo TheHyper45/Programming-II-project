@@ -70,7 +70,8 @@ namespace core {
 		Vec2 position;
 		Entity_Direction dir;
 		bool destroyed;
-		float enemy_choose_action_timer;
+		float enemy_change_dir_timer;
+		float shoot_cooldown;
 	};
 	struct Bullet {
 		Vec2 position;
@@ -142,11 +143,11 @@ namespace core {
 		std::vector<Explosion> explosions;
 		float game_lose_timer;
 		std::vector<Spawn_Effect> spawn_effects;
-		float player_shoot_cooldown;
 		float player_respawn_timer;
 		std::mt19937_64 random_engine;
 		std::uniform_int_distribution<std::size_t> enamy_spawn_point_random_dist;
 		std::uniform_real_distribution<float> enemy_action_duration_dist;
+		std::uniform_real_distribution<float> chance_0_1_dist;
 		std::uint32_t max_enemy_count_on_screen;
 		std::uint32_t remaining_enemy_count_to_spawn;
 		float enemy_spawn_timer;

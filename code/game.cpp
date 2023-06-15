@@ -40,11 +40,12 @@ namespace core {
 	Game::Game(Renderer* _renderer,Platform* _platform) : renderer(_renderer),platform(_platform),scene(Scene::Main_Menu),
 		current_main_menu_option(),update_timer(),construction_marker_pos(),construction_choosing_tile(),construction_tile_choice_marker_pos(),
 		construction_current_tile_template_index(),tile_templates(),show_fps(),quit(),tiles(),player_lifes(),player_tank(),
-		eagle(),game_lose_timer(),spawn_effects(),player_shoot_cooldown(),enemy_tanks(),player_respawn_timer(),random_engine(),enamy_spawn_point_random_dist(),
-		enemy_action_duration_dist(),max_enemy_count_on_screen(),remaining_enemy_count_to_spawn(),enemy_spawn_timer(),game_win_timer(),current_stage_index() {
+		eagle(),game_lose_timer(),spawn_effects(),enemy_tanks(),player_respawn_timer(),random_engine(),enamy_spawn_point_random_dist(),
+		enemy_action_duration_dist(),chance_0_1_dist(),max_enemy_count_on_screen(),remaining_enemy_count_to_spawn(),enemy_spawn_timer(),game_win_timer(),current_stage_index() {
 		random_engine = std::mt19937_64(std::time(nullptr));
 		enamy_spawn_point_random_dist = std::uniform_int_distribution<std::size_t>(0,Enemy_Spawner_Location_Count - 1);
 		enemy_action_duration_dist = std::uniform_real_distribution<float>(0.5f,3.0f);
+		chance_0_1_dist = std::uniform_real_distribution<float>(0.0f,1.0f);
 
 		tiles_texture = renderer->sprite_atlas("./assets/tiles_16x16.bmp",16);
 		construction_place_marker = renderer->sprite("./assets/marker.bmp");
@@ -131,8 +132,8 @@ namespace core {
 			return;
 		}
 
-		player_shoot_cooldown -= delta_time;
-		if(player_shoot_cooldown <= 0.0f) player_shoot_cooldown = 0.0f;
+		player_tank.shoot_cooldown -= delta_time;
+		if(player_tank.shoot_cooldown <= 0.0f) player_tank.shoot_cooldown = 0.0f;
 
 		Vec2 forward = {};
 		if(platform->is_key_down(Keycode::Right) || platform->is_key_down(Keycode::D)) {
@@ -151,13 +152,13 @@ namespace core {
 			player_tank.dir = Entity_Direction::Up;
 			forward = {0.0f,-1.0f};
 		}
-		if(platform->was_key_pressed(Keycode::Space) && player_shoot_cooldown <= 0.0f) {
+		if(platform->was_key_pressed(Keycode::Space) && player_tank.shoot_cooldown <= 0.0f) {
 			Bullet bullet{};
 			bullet.fired_by_player = true;
 			bullet.dir = player_tank.dir;
 			bullet.position = player_tank.position + Player_Tank_Bullet_Firing_Positions[std::size_t(bullet.dir)];
 			bullets.push_back(bullet);
-			player_shoot_cooldown = Tank_Shoot_Cooldown;
+			player_tank.shoot_cooldown = Tank_Shoot_Cooldown;
 		}
 
 		player_tank.position.x += forward.x * Tank_Speed * delta_time;
@@ -175,7 +176,7 @@ namespace core {
 				if(tile.template_index == Invalid_Tile_Index) continue;
 
 				const auto& tile_template = tile_templates[tile.template_index];
-				if(tile_template.flag != Tile_Flag::Solid) continue;
+				if(tile_template.flag != Tile_Flag::Solid && tile_template.flag != Tile_Flag::Bulletpass) continue;
 
 				player_tank.position.x = end_x / 2.0f - Tank_Size.x / 2.0f - 0.001f;
 			}
@@ -187,7 +188,7 @@ namespace core {
 				if(tile.template_index == Invalid_Tile_Index) continue;
 
 				const auto& tile_template = tile_templates[tile.template_index];
-				if(tile_template.flag != Tile_Flag::Solid) continue;
+				if(tile_template.flag != Tile_Flag::Solid && tile_template.flag != Tile_Flag::Bulletpass) continue;
 
 				player_tank.position.y = end_y / 2.0f - Tank_Size.y / 2.0f - 0.001f;
 			}
@@ -199,7 +200,7 @@ namespace core {
 				if(tile.template_index == Invalid_Tile_Index) continue;
 
 				const auto& tile_template = tile_templates[tile.template_index];
-				if(tile_template.flag != Tile_Flag::Solid) continue;
+				if(tile_template.flag != Tile_Flag::Solid && tile_template.flag != Tile_Flag::Bulletpass) continue;
 
 				player_tank.position.x = start_x / 2.0f + Tank_Size.x + 0.001f;
 			}
@@ -211,7 +212,7 @@ namespace core {
 				if(tile.template_index == Invalid_Tile_Index) continue;
 
 				const auto& tile_template = tile_templates[tile.template_index];
-				if(tile_template.flag != Tile_Flag::Solid) continue;
+				if(tile_template.flag != Tile_Flag::Solid && tile_template.flag != Tile_Flag::Bulletpass) continue;
 
 				player_tank.position.y = start_y / 2.0f + Tank_Size.y + 0.001f;
 			}
@@ -244,10 +245,17 @@ namespace core {
 		}
 
 		for(auto& enemy : enemy_tanks) {
-			enemy.enemy_choose_action_timer -= delta_time;
-			if(enemy.enemy_choose_action_timer <= 0.0f) {
-				enemy.enemy_choose_action_timer = enemy_action_duration_dist(random_engine);
-			}
+			/*enemy.enemy_change_dir_timer -= delta_time;
+			if(enemy.enemy_change_dir_timer <= 0.0f) {
+				enemy.enemy_change_dir_timer = enemy_action_duration_dist(random_engine);
+
+				if(enemy.dir == Entity_Direction::Down || enemy.dir == Entity_Direction::Up) {
+					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Left : Entity_Direction::Right;
+				}
+				else if(enemy.dir == Entity_Direction::Left || enemy.dir == Entity_Direction::Right) {
+					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Down : Entity_Direction::Up;
+				}
+			}*/
 
 			enemy.position.x += core::entity_direction_to_vector(enemy.dir).x * Tank_Speed * delta_time;
 			enemy.position.y += core::entity_direction_to_vector(enemy.dir).y * Tank_Speed * delta_time;
@@ -264,9 +272,10 @@ namespace core {
 					if(tile.template_index == Invalid_Tile_Index) continue;
 
 					const auto& tile_template = tile_templates[tile.template_index];
-					if(tile_template.flag != Tile_Flag::Solid) continue;
+					if(tile_template.flag != Tile_Flag::Solid && tile_template.flag != Tile_Flag::Bulletpass) continue;
 
 					enemy.position.x = end_x / 2.0f - Tank_Size.x / 2.0f - 0.001f;
+					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Down : Entity_Direction::Up;
 				}
 			}
 			if(enemy.dir == Entity_Direction::Down && (end_y >= 0 && end_y < Background_Tile_Count_Y * 2)) {
@@ -276,9 +285,10 @@ namespace core {
 					if(tile.template_index == Invalid_Tile_Index) continue;
 
 					const auto& tile_template = tile_templates[tile.template_index];
-					if(tile_template.flag != Tile_Flag::Solid) continue;
+					if(tile_template.flag != Tile_Flag::Solid && tile_template.flag != Tile_Flag::Bulletpass) continue;
 
 					enemy.position.y = end_y / 2.0f - Tank_Size.y / 2.0f - 0.001f;
+					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Left : Entity_Direction::Right;
 				}
 			}
 			if(enemy.dir == Entity_Direction::Left && (start_x >= 0 && start_x < Background_Tile_Count_X * 2)) {
@@ -288,9 +298,10 @@ namespace core {
 					if(tile.template_index == Invalid_Tile_Index) continue;
 
 					const auto& tile_template = tile_templates[tile.template_index];
-					if(tile_template.flag != Tile_Flag::Solid) continue;
+					if(tile_template.flag != Tile_Flag::Solid && tile_template.flag != Tile_Flag::Bulletpass) continue;
 
 					enemy.position.x = start_x / 2.0f + Tank_Size.x + 0.001f;
+					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Down : Entity_Direction::Up;
 				}
 			}
 			if(enemy.dir == Entity_Direction::Up && (start_y >= 0 && start_y < Background_Tile_Count_Y * 2)) {
@@ -300,9 +311,10 @@ namespace core {
 					if(tile.template_index == Invalid_Tile_Index) continue;
 
 					const auto& tile_template = tile_templates[tile.template_index];
-					if(tile_template.flag != Tile_Flag::Solid) continue;
+					if(tile_template.flag != Tile_Flag::Solid && tile_template.flag != Tile_Flag::Bulletpass) continue;
 
 					enemy.position.y = start_y / 2.0f + Tank_Size.y + 0.001f;
+					enemy.dir = (chance_0_1_dist(random_engine) <= 0.5f) ? Entity_Direction::Left : Entity_Direction::Right;
 				}
 			}
 		}
