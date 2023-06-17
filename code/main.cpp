@@ -32,6 +32,7 @@ int main() {
             renderer.end();
             platform.swap_window_buffers();
         }
+
         return 0;
     }
     catch(const core::Runtime_Exception& except) {
