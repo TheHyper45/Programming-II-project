@@ -6,14 +6,17 @@
 #include <cinttypes>
 #include "game.hpp"
 #include "exceptions.hpp"
-
+#include <Windows.h>
 namespace core {
 	static constexpr float Main_Menu_First_Option_Y_Offset = 7.0f;
 	static constexpr const char* Main_Menu_Options[] = {"1 player","2 players","Load Level","Construction","Quit"};
 	static constexpr std::size_t Main_Menu_Options_Count = sizeof(Main_Menu_Options) / sizeof(*Main_Menu_Options);
 	static constexpr float Map_First_Option_Y_Offset = 5.0f;
-	static constexpr const char* Map_Options[] = {"Level 1","Level 2","Level 3","Level 4","Level 5 "};
+	static constexpr const char* Map_Options[] = {"Level 1","Level 2","Level 3","Level 4","Level 5 ","Search in windows"};
 	static constexpr std::size_t Map_Options_Count = sizeof(Map_Options) / sizeof(*Map_Options);
+	static constexpr float Players_Mode_Option_Y_Offset = 4.0f;
+	static constexpr const char* Players_Mode_Options[] = { "1 Player","2 Players" };
+	static constexpr std::size_t Players_Mode_Options_Count = sizeof(Players_Mode_Options) / sizeof(*Players_Mode_Options);
 	static constexpr float Tank_Speed = 4.0f;
 	static constexpr float Bullet_Speed = 12.0f;
 	static constexpr std::uint32_t Player_Tank_Sprite_Layer_Index = 0;
@@ -923,6 +926,7 @@ namespace core {
 
 		switch(scene) {
 			case Scene::Main_Menu: {
+				if(platform->is_key_down(Keycode::Escape))load_map("./assets/maps/map_menu.txt");
 				if(platform->was_key_pressed(Keycode::Down) || platform->was_key_pressed(Keycode::S)) {
 					current_main_menu_option += 1;
 					if(current_main_menu_option >= Main_Menu_Options_Count) current_main_menu_option = 0;
@@ -948,6 +952,7 @@ namespace core {
 							break;
 						}
 						case 2: {
+							load_map("./assets/maps/map1.txt");
 							scene = Scene::Level_Selection;
 							break;
 						}
@@ -1391,65 +1396,109 @@ namespace core {
 				break;
 			}
 
-
 			case Scene::Level_Selection: {
+			
+				if (platform->was_key_pressed(Keycode::Escape)) {
+					scene = Scene::Main_Menu;
+					break;
+				}
+				float Intro_Screen_Duration = 5;
 				update_timer += delta_time;
-				static constexpr float Intro_Screen_Duration = 0.0f;
-				if (update_timer >= Intro_Screen_Duration) {
-					update_timer = 0.0f;
+				if (platform->was_key_pressed(Keycode::Up) || platform->was_key_pressed(Keycode::Left) || platform->was_key_pressed(Keycode::W)) {
+					if (current_map_option == 0) current_map_option = Map_Options_Count;
+					current_map_option -= 1;
+					switch (current_map_option) {
+					case 0: load_map("./assets/maps/map1.txt"); break;
+					case 1: load_map("./assets/maps/map2.txt"); break;
+					case 2: load_map("./assets/maps/map3.txt"); break;
+					case 3: load_map("./assets/maps/map4.txt"); break;
+					case 4: load_map("./assets/maps/map5.txt"); break;
+					case 5: load_map("./assets/maps/map_menu.txt"); break;
+					default: printf("Something is very worng");
+					}
+					update_timer = 0;
+				}
+				if (platform->was_key_pressed(Keycode::Down) || platform->was_key_pressed(Keycode::Right) || platform->was_key_pressed(Keycode::S)) {
+					current_map_option += 1;
+					if (current_map_option >= Map_Options_Count) current_map_option = 0;
+					switch (current_map_option) {
+					case 0: load_map("./assets/maps/map1.txt"); break;
+					case 1: load_map("./assets/maps/map2.txt"); break;
+					case 2: load_map("./assets/maps/map3.txt"); break;
+					case 3: load_map("./assets/maps/map4.txt"); break;
+					case 4: load_map("./assets/maps/map5.txt"); break;
+					case 5: load_map("./assets/maps/map_menu.txt"); break;
+					default: printf("Something is very worng");
+					}
+					update_timer = 0;
+				}
+				if (platform->was_key_pressed(Keycode::Return)||update_timer >=Intro_Screen_Duration) {
+					scene = Scene::Single_Multiplayer_Selection;
+				}
+						break;
+			}
+			case Scene::Single_Multiplayer_Selection:{
 
-					for (std::uint32_t y = 0; y < Background_Tile_Count_Y * 2; y += 1) {
-						for (std::uint32_t x = 0; x < Background_Tile_Count_X * 2; x += 1) {
-							tiles[y * (Background_Tile_Count_X * 2) + x] = Tile{ Invalid_Tile_Index };
-						}
-						static constexpr float Intro_Screen_Duration = 30.0f;
-						if (platform->was_key_pressed(Keycode::Up) || platform->was_key_pressed(Keycode::W)) {
-							current_map_option += 1;
-							if (current_map_option >= Main_Menu_Options_Count) current_map_option = 0;
-						}
-						if (platform->was_key_pressed(Keycode::Down) || platform->was_key_pressed(Keycode::S)) {
-							if (current_map_option == 0) current_map_option = Main_Menu_Options_Count;
-							current_map_option -= 1;
-						}
-						current_stage_index = current_map_option;
-						switch (current_stage_index) {
-						case 0: load_map("./assets/maps/map1.txt"); break;
-						case 1: load_map("./assets/maps/map2.txt"); break;
-						case 2: load_map("./assets/maps/map3.txt"); break;
-						case 3: load_map("./assets/maps/map4.txt"); break;
-						case 4: load_map("./assets/maps/map5.txt"); break;
-						}
-					if (update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
-						update_timer = 0.0f;
-						eagle.destroyed = false;
-						eagle.position = { Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f };
-						player_tank.destroyed = false;
-						player_tank.dir = Entity_Direction::Up;
-						player_tank.position = eagle.position - Vec2{3.0f, 0.0f};
-						player_lifes = 3;
-						bullets.clear();
-						enemy_tanks.clear();
-						spawn_effects.clear();
+				if (platform->was_key_pressed(Keycode::Escape)) {
+					scene = Scene::Main_Menu;
+					break;
+				}
+				float Intro_Screen_Duration = 3;
+				update_timer += delta_time;
+				if (platform->was_key_pressed(Keycode::Up) || platform->was_key_pressed(Keycode::Left) || platform->was_key_pressed(Keycode::W)) {
+					if (current_player_mode_option == 0) current_player_mode_option = Players_Mode_Options_Count;
+					current_player_mode_option -= 1;
+					update_timer = 0;
+				}
+				if (platform->was_key_pressed(Keycode::Down) || platform->was_key_pressed(Keycode::Right) || platform->was_key_pressed(Keycode::S)) {
+					current_player_mode_option += 1;
+					if (current_player_mode_option >= Players_Mode_Options_Count) current_player_mode_option = 0;
+					update_timer = 0;
+				}
+					scene = Scene::Single_Multiplayer_Selection;
+//Please change the way the new level is choosen -the current mechanism is veery bad.
 
-						max_enemy_count_on_screen = 3;
-						remaining_enemy_count_to_spawn = 12;
-						enemy_spawn_timer = Enemy_Spawn_Time;
-						game_win_timer = 1.0f;
-						game_lose_timer = 1.0f;
-
-						scene = Scene::Level_Selected;
-						
+				if (platform->was_key_pressed(Keycode::Return) || update_timer >= Intro_Screen_Duration) {
+					switch (current_player_mode_option) {
+						case 0: {
+							//scene = Scene::Game_1player;
+							break;
+						}
+						case 1: {
+							//scene = Scene::Game_2player;
+							break;
 						}
 					}
+					{	update_timer = 0.0f;
+					eagle.destroyed = false;
+					eagle.position = { Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f };
+					player_tank.destroyed = false;
+					player_tank.dir = Entity_Direction::Up;
+					player_tank.position = eagle.position - Vec2{3.0f, 0.0f};
+					player_lifes = 3;
+					bullets.clear();
+					enemy_tanks.clear();
+					spawn_effects.clear();
+
+					max_enemy_count_on_screen = 3;
+					remaining_enemy_count_to_spawn = 12;
+					enemy_spawn_timer = Enemy_Spawn_Time;
+					game_win_timer = 1.0f;
+					game_lose_timer = 1.0f;
+					scene = Scene::Level_Selected;
+					}
+
 				}
 				break;
 			}
+
+
 			case Scene::Level_Selected: {	
 				if (platform->was_key_pressed(Keycode::Escape)) {
-				load_map("./assets/maps/map_menu.txt");
 				scene = Scene::Main_Menu;
 				break;
-			}
+				}
+			
 			update_player(delta_time);
 
 				Rect screen_rect = { 0.0f,0.0f,float(Background_Tile_Count_X),float(Background_Tile_Count_Y) };
@@ -1901,6 +1950,15 @@ namespace core {
 					renderer->draw_text({ Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Map_First_Option_Y_Offset + float(i) * 0.5f,1 }, { 0.25f,0.25f }, color, Map_Options[i]);
 				}
 				break; 
+			}
+			case Scene::Single_Multiplayer_Selection:{
+				render_map();
+				for (std::size_t i = 0; i < Players_Mode_Options_Count; i += 1) {
+					auto rect = renderer->compute_text_dims({ 0,0,1 }, { 0.25f,0.25f }, Players_Mode_Options[i]);
+					Vec3 color = (current_player_mode_option == i) ? Vec3{1, 1, 0} : Vec3{ 1,1,1 };
+					renderer->draw_text({ Background_Tile_Count_X / 2.0f - rect.width,Players_Mode_Option_Y_Offset + float(i) * 4.0f,1 }, { 1.0f,1.0f }, color, Players_Mode_Options[i]);
+				}
+				break;
 			}
 			case Scene::Level_Selected: {
 

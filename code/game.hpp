@@ -8,6 +8,8 @@
 #include "platform.hpp"
 #include "renderer.hpp"
 
+
+
 namespace core {
 	enum class Scene {
 		Main_Menu,
@@ -19,6 +21,7 @@ namespace core {
 		Outro_2player,
 		Construction,
 		Level_Selection,
+		Single_Multiplayer_Selection,
 		Level_Selected,
 		Game_Over,
 		Game_Over2,
@@ -128,6 +131,7 @@ namespace core {
 		Scene scene;
 		std::size_t current_main_menu_option;
 		std::size_t current_map_option=0;
+		std::size_t current_player_mode_option = 0;
 		float update_timer;
 		Sprite_Index tiles_texture;
 		Sprite_Index construction_place_marker;
