@@ -1456,7 +1456,7 @@ namespace core {
 					update_timer = 0;
 				}
 					scene = Scene::Single_Multiplayer_Selection;
-//Please change the way the new level is choosen -the current mechanism is veery bad.
+//Please change the way the new level is choosen -the current mechanism is veery bad. You should probably delate Scene:: Level_Selected
 
 				if (platform->was_key_pressed(Keycode::Return) || update_timer >= Intro_Screen_Duration) {
 					switch (current_player_mode_option) {
