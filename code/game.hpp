@@ -5,6 +5,7 @@
 #include <vector>
 #include <random>
 #include <cstddef>
+#include <optional>
 #include "platform.hpp"
 #include "renderer.hpp"
 
@@ -20,8 +21,8 @@ namespace core {
 		Construction,
 		Level_Selection,
 		Level_Selected,
-		Game_Over,
-		Game_Over2,
+		Game_Over_1player,
+		Game_Over_2player,
 		Victory_Screen
 	};
 
@@ -52,6 +53,12 @@ namespace core {
 	};
 
 	enum class Entity_Direction { Right,Down,Left,Up };
+	struct Entity_Direction_Triple {
+		Entity_Direction dir0;
+		Entity_Direction dir1;
+		Entity_Direction dir_back;
+	};
+
 	[[nodiscard]] inline float entity_direction_to_rotation(Entity_Direction dir) {
 		switch(dir) {
 			case Entity_Direction::Right: return PI / 2.0f;
@@ -77,6 +84,8 @@ namespace core {
 		bool destroyed;
 		float shoot_cooldown;
 		float ai_dir_change_timer;
+		float ai_react_timer;
+		std::uint32_t hop_count_until_shoot;
 	};
 	struct Bullet {
 		Vec2 position;
@@ -101,6 +110,18 @@ namespace core {
 		bool destroyed;
 		int texture_serie;
 	};
+	struct Player {
+		Tank tank;
+		float respawn_timer;
+		std::uint32_t lifes;
+		float invulnerability_timer;
+	};
+	struct Raycast_Outcome {
+		enum class Type { None,Tile,Player1,Player2,Eagle };
+		Type type;
+		Vec2 impact_point;
+		[[nodiscard]] bool hit_target() const noexcept { return type == Type::Player1 || type == Type::Player2 || type == Type::Eagle; }
+	};
 
 	class Game {
 	public:
@@ -112,10 +133,12 @@ namespace core {
 		void render(float delta_time);
 		[[nodiscard]] bool quit_requested() const noexcept;
 	private:
-		void update_player(float delta_time);
-		void update_2player(float delta_time);
+		void update_player(Player* player,float delta_time);
 		void update_enemies(float delta_time);
-		void update2_enemies(float delta_time);
+		void update_bullets(float delta_time);
+		std::optional<Ipoint> check_collision_with_tiles(Vec2* out_position,Vec2 collider_size,std::int32_t start_x,std::int32_t start_y,std::int32_t end_x,std::int32_t end_y,Entity_Direction dir,bool is_bullet = false);
+		[[nodiscard]] Raycast_Outcome raycast(Vec2 origin,Entity_Direction dir,bool include_bulletpass_tiles,bool skip_tiles,bool skip_targets);
+
 		void add_spawn_effect(Vec2 position);
 		void add_explosion(Vec2 position,float delta_time);
 		void save_map(const char* file_path);
@@ -142,20 +165,12 @@ namespace core {
 		bool show_fps;
 		bool quit;
 		Tile tiles[(Background_Tile_Count_X * 2) * (Background_Tile_Count_Y * 2)];
-		std::uint32_t player_lifes;
-		Tank player_tank;
-
-		std::uint32_t second_player_lifes;
-		Tank second_tank;
-
 		Eagle eagle;
 		std::vector<Bullet> bullets;
 		std::vector<Tank> enemy_tanks;
 		std::vector<Explosion> explosions;
 		float game_lose_timer;
 		std::vector<Spawn_Effect> spawn_effects;
-		float player_respawn_timer;
-		float second_player_respawn_timer;
 		std::minstd_rand0 random_engine;
 		std::uniform_int_distribution<std::size_t> enamy_spawn_point_random_dist;
 		std::uniform_real_distribution<float> enemy_action_duration_dist;
@@ -165,8 +180,8 @@ namespace core {
 		float enemy_spawn_timer;
 		float game_win_timer;
 		std::size_t current_stage_index;
-		float player_invulnerability_timer;
-		float second_player_invulnerability_timer;
+		Player first_player;
+		Player second_player;
 	};
 }
 #endif

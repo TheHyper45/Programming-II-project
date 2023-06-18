@@ -18,7 +18,7 @@
 
 namespace core {
 	static constexpr const char* Window_Class_Name = "CustomWindowClass";
-	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_CAPTION | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_VISIBLE;
+	static constexpr DWORD Window_Flags = WS_BORDER | WS_SYSMENU | WS_CAPTION | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_MAXIMIZE | WS_VISIBLE;
 	static constexpr int Array_End_Marker = 0;
 
 	const char* keycode_to_string(Keycode code) {
@@ -336,7 +336,6 @@ namespace core {
 		wc.cbWndExtra = sizeof(Platform_Windows_Data*) + sizeof(LONG_PTR); //If you use 'wc.cbWndExtra', you have to add 'sizeof(LONG_PTR)' to it, otherwise it won't work.
 		if(!RegisterClassExA(&wc)) throw Runtime_Exception("Couldn't register window class.");
 
-		data.window_client_dims = {client_width,client_height};
 		RECT client_rect = {0,0,LONG(client_width),LONG(client_height)};
 		if(!AdjustWindowRect(&client_rect,Window_Flags,FALSE)) throw Runtime_Exception("Couldn't adjust client rect dimensions.");
 		client_width = std::uint32_t(client_rect.right - client_rect.left);
@@ -345,6 +344,13 @@ namespace core {
 		data.window = CreateWindowExA(0,Window_Class_Name,title,Window_Flags,CW_USEDEFAULT,CW_USEDEFAULT,int(client_width),int(client_height),HWND_DESKTOP,nullptr,GetModuleHandleA(nullptr),nullptr);
 		if(!data.window) throw Runtime_Exception("Couldn't create a window.");
 		data.window_closed = false;
+
+		{
+			RECT rect = {};
+			GetClientRect(data.window,&rect);
+			data.window_client_dims = {std::uint32_t(rect.right),std::uint32_t(rect.bottom)};
+			data.window_resized = true;
+		}
 		
 		data.dc = GetDC(data.window);
 		if(!data.dc) throw Runtime_Exception("Couldn't get window DC.");
