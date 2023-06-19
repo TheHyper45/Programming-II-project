@@ -147,6 +147,8 @@ namespace core {
 		void save_map(const char* file_path);
 		void load_map(const char* file_path);
 		void render_map();
+		void load_map_from_drive();
+		void save_map_on_drive();
 		static inline constexpr std::uint32_t Invalid_Tile_Index = std::uint32_t(-1);
 
 		Renderer* renderer;
@@ -186,6 +188,7 @@ namespace core {
 		std::size_t current_stage_index;
 		Player first_player;
 		Player second_player;
+		bool skip = true;
 	};
 }
 #endif
