@@ -86,6 +86,7 @@ namespace core {
 		float ai_dir_change_timer;
 		float ai_react_timer;
 		std::uint32_t hop_count_until_shoot;
+		bool ai_wants_to_shoot;
 	};
 	struct Bullet {
 		Vec2 position;

@@ -358,13 +358,23 @@ namespace core {
 						enemy.hop_count_until_shoot = Enemy_Hop_Count_To_Shoot;
 					}
 					else {
-						auto raycast_against_targets = raycast(firing_pos,enemy.dir,false,false,false);
-						if(raycast_against_targets.hit_target()) {
+						if(enemy.ai_wants_to_shoot) {
+							enemy.ai_wants_to_shoot = false;
 							Bullet bullet{};
 							bullet.dir = enemy.dir;
 							bullet.position = firing_pos;
 							bullets.push_back(bullet);
 							enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+						}
+						else {
+							auto raycast_against_targets = raycast(firing_pos,enemy.dir,false,false,false);
+							if(raycast_against_targets.hit_target()) {
+								Bullet bullet{};
+								bullet.dir = enemy.dir;
+								bullet.position = firing_pos;
+								bullets.push_back(bullet);
+								enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+							}
 						}
 					}
 				}
@@ -386,7 +396,7 @@ namespace core {
 								bullet.dir = enemy.dir;
 								bullet.position = enemy.position + Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
 								bullets.push_back(bullet);
-								enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+								enemy.shoot_cooldown = Tank_Shoot_Cooldown * 2;
 							}
 							break;
 						}
@@ -397,11 +407,8 @@ namespace core {
 							enemy.dir = dir;
 							if(enemy.hop_count_until_shoot > 0) enemy.hop_count_until_shoot -= 1;
 							if(enemy.shoot_cooldown <= 0.0f && chance_0_1_dist(random_engine) <= 0.25f) {
-								Bullet bullet{};
-								bullet.dir = enemy.dir;
-								bullet.position = enemy.position + Tank_Bullet_Firing_Positions[std::size_t(enemy.dir)];
-								bullets.push_back(bullet);
-								enemy.shoot_cooldown = Tank_Shoot_Cooldown;
+								enemy.ai_wants_to_shoot = true;
+								enemy.shoot_cooldown = Tank_Shoot_Cooldown * 2;
 							}
 							break;
 						}
