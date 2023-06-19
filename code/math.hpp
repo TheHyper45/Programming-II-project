@@ -10,18 +10,10 @@ namespace core {
 		float x;
 		float y;
 
-		[[nodiscard]] Vec2 operator+(Vec2 v) {
-			return {x + v.x,y + v.y};
-		}
-		[[nodiscard]] Vec2 operator-(Vec2 v) {
-			return {x - v.x,y - v.y};
-		}
-		[[nodiscard]] Vec2 operator*(float v) {
-			return {x * v,y * v};
-		}
-		[[nodiscard]] Vec2 operator/(float v) {
-			return {x / v,y / v};
-		}
+		[[nodiscard]] Vec2 operator+(Vec2 v) { return {x + v.x,y + v.y}; }
+		[[nodiscard]] Vec2 operator-(Vec2 v) { return {x - v.x,y - v.y}; }
+		[[nodiscard]] Vec2 operator*(float v) { return {x * v,y * v}; }
+		[[nodiscard]] Vec2 operator/(float v) { return {x / v,y / v}; }
 
 		Vec2& operator+=(const Vec2& v) {
 			x += v.x;
@@ -38,9 +30,7 @@ namespace core {
 		float x;
 		float y;
 		float z;
-		[[nodiscard]] explicit operator Vec2() {
-			return { x,y };
-		}
+		[[nodiscard]] explicit operator Vec2() { return { x,y }; }
 	};
 	struct Vec4 {
 		float x;
