@@ -739,7 +739,6 @@ namespace core {
 							update_timer = 0;
 						}
 					if (update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
-						printf("ładowanie mapy %d\n", current_map_option);
 						if (current_map_option == 5|| current_map_option == -1) {
 							
 							load_map_from_drive();
