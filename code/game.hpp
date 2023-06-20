@@ -9,6 +9,8 @@
 #include "platform.hpp"
 #include "renderer.hpp"
 
+
+
 namespace core {
 	enum class Scene {
 		Main_Menu,
@@ -20,6 +22,7 @@ namespace core {
 		Outro_2player,
 		Construction,
 		Level_Selection,
+		Single_Multiplayer_Selection,
 		Level_Selected,
 		Game_Over_1player,
 		Game_Over_2player,
@@ -145,6 +148,8 @@ namespace core {
 		void save_map(const char* file_path);
 		void load_map(const char* file_path);
 		void render_map();
+		void load_map_from_drive();
+		void save_map_on_drive();
 		static inline constexpr std::uint32_t Invalid_Tile_Index = std::uint32_t(-1);
 
 		Renderer* renderer;
@@ -152,6 +157,7 @@ namespace core {
 		Scene scene;
 		std::size_t current_main_menu_option;
 		std::size_t current_map_option=0;
+		std::size_t current_player_mode_option = 0;
 		float update_timer;
 		Sprite_Index tiles_texture;
 		Sprite_Index construction_place_marker;
@@ -183,6 +189,7 @@ namespace core {
 		std::size_t current_stage_index;
 		Player first_player;
 		Player second_player;
+		bool skip = true;
 	};
 }
 #endif

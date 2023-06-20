@@ -6,14 +6,17 @@
 #include <cinttypes>
 #include "game.hpp"
 #include "exceptions.hpp"
-
+#include <Windows.h>
 namespace core {
 	static constexpr float Main_Menu_First_Option_Y_Offset = 7.0f;
 	static constexpr const char* Main_Menu_Options[] = {"1 player","2 players","Load Level","Construction","Quit"};
 	static constexpr std::size_t Main_Menu_Options_Count = sizeof(Main_Menu_Options) / sizeof(*Main_Menu_Options);
 	static constexpr float Map_First_Option_Y_Offset = 5.0f;
-	static constexpr const char* Map_Options[] = {"Level 1","Level 2","Level 3","Level 4","Level 5 "};
+	static constexpr const char* Map_Options[] = {"Level 1","Level 2","Level 3","Level 4","Level 5 ","Search in windows"};
 	static constexpr std::size_t Map_Options_Count = sizeof(Map_Options) / sizeof(*Map_Options);
+	static constexpr float Players_Mode_Option_Y_Offset = 4.0f;
+	static constexpr const char* Players_Mode_Options[] = { "1 Player","2 Players" };
+	static constexpr std::size_t Players_Mode_Options_Count = sizeof(Players_Mode_Options) / sizeof(*Players_Mode_Options);
 	static constexpr float Tank_Speed = 4.0f;
 	static constexpr float Bullet_Speed = 12.0f;
 	static constexpr std::uint32_t Player_Tank_Sprite_Layer_Index = 0;
@@ -535,6 +538,7 @@ namespace core {
 		if(platform->was_key_pressed(Keycode::F3)) show_fps = !show_fps;
 		switch(scene) {
 			case Scene::Main_Menu: {
+				if(platform->is_key_down(Keycode::Escape))load_map("./assets/maps/map_menu.txt");
 				if(platform->was_key_pressed(Keycode::Down) || platform->was_key_pressed(Keycode::S)) {
 					current_main_menu_option += 1;
 					if(current_main_menu_option >= Main_Menu_Options_Count) current_main_menu_option = 0;
@@ -559,7 +563,8 @@ namespace core {
 							break;
 						}
 						case 2: {
-							platform->error_message_box("Work in progress.");
+							first_player.lifes = Player_Starting_Life_Count;
+							scene = Scene::Level_Selection;
 							break;
 						}
 						case 3: {
@@ -602,14 +607,15 @@ namespace core {
 				static constexpr float Intro_Screen_Duration = 2.5f;
 				if(update_timer >= Intro_Screen_Duration) {
 					update_timer = 0.0f;
-					switch(current_stage_index) {
+					if (skip) {
+						switch (current_stage_index) {
 						case 0: load_map("./assets/maps/map1.txt"); break;
 						case 1: load_map("./assets/maps/map2.txt"); break;
 						case 2: load_map("./assets/maps/map3.txt"); break;
 						case 3: load_map("./assets/maps/map4.txt"); break;
 						case 4: load_map("./assets/maps/map5.txt"); break;
+						}
 					}
-
 					eagle.destroyed = false;
 					eagle.position = {Background_Tile_Count_X / 2.0f,Background_Tile_Count_Y - 2.0f};
 
@@ -687,12 +693,73 @@ namespace core {
 			}
 			case Scene::Outro_1player:
 			case Scene::Outro_2player: {
+				skip = true;
 				if(platform->was_key_pressed(Keycode::Return)) {
 					current_stage_index += 1;
-					scene = ((scene == Scene::Outro_1player) ? Scene::Intro_1player : Scene::Intro_2player);
+					scene = Scene::Intro_2player;
 				}
 				break;
 			}
+
+
+			case Scene::Level_Selection: {
+				update_timer += delta_time;
+				static constexpr float Intro_Screen_Duration = 0.0f;
+				if (update_timer >= Intro_Screen_Duration) {
+					update_timer = 0.0f;
+
+					
+						static constexpr float Intro_Screen_Duration = 30.0f;
+						if (platform->was_key_pressed(Keycode::Up) || platform->was_key_pressed(Keycode::Left) || platform->was_key_pressed(Keycode::W)) {
+							if (current_map_option == 0) current_map_option = Map_Options_Count;
+							current_map_option -= 1;
+							switch (current_map_option) {
+							case 0: load_map("./assets/maps/map1.txt"); break;
+							case 1: load_map("./assets/maps/map2.txt"); break;
+							case 2: load_map("./assets/maps/map3.txt"); break;
+							case 3: load_map("./assets/maps/map4.txt"); break;
+							case 4: load_map("./assets/maps/map5.txt"); break;
+							case 5: load_map("./assets/maps/map_menu.txt"); break;
+							default: printf("Something is very worng");
+							}
+							update_timer = 0;
+						}
+						if (platform->was_key_pressed(Keycode::Down) || platform->was_key_pressed(Keycode::Right) || platform->was_key_pressed(Keycode::S)) {
+							current_map_option += 1;
+							if (current_map_option > Map_Options_Count) current_map_option = 0;
+							switch (current_map_option) {
+							case 0: load_map("./assets/maps/map1.txt"); break;
+							case 1: load_map("./assets/maps/map2.txt"); break;
+							case 2: load_map("./assets/maps/map3.txt"); break;
+							case 3: load_map("./assets/maps/map4.txt"); break;
+							case 4: load_map("./assets/maps/map5.txt"); break;
+							case 5: load_map("./assets/maps/map_menu.txt"); break;
+							default: printf("Something is very worng");
+							}
+							update_timer = 0;
+						}
+					if (update_timer >= Intro_Screen_Duration || platform->was_key_pressed(Keycode::Return)) {
+						if (current_map_option == 5|| current_map_option == -1) {
+							
+							load_map_from_drive();
+						}
+						first_player.lifes = Player_Starting_Life_Count;
+						skip = false;
+							scene = Scene::Intro_1player;
+						
+					}
+				}
+				break;
+			}
+			case Scene::Level_Selected: {	
+				if (platform->was_key_pressed(Keycode::Escape)) {
+					load_map("./assets/maps/map_menu.txt");
+					scene = Scene::Main_Menu;
+					break;
+				}
+
+				break;
+			};
 			case Scene::Construction: {
 				auto mouse_pos = platform->mouse_position();
 				auto dims = renderer->render_client_rect_dimensions();
@@ -727,7 +794,7 @@ namespace core {
 						if(platform->was_key_pressed(Keycode::S)) {
 							try {
 								//save_map("./assets/maps/map5.txt");
-								save_map("./_map.txt");
+								save_map_on_drive();
 							}
 							catch(const File_Open_Exception& except) {
 								char buffer[1024] = {};
@@ -737,16 +804,20 @@ namespace core {
 							catch(...) { throw; }
 						}
 						if(platform->was_key_pressed(Keycode::L)) {
+							
+
 							try {
-								//load_map("./assets/maps/map5.txt");
-								load_map("./_map.txt");
+								load_map_from_drive();
+								
 							}
 							catch(const File_Open_Exception& except) {
 								char buffer[1024] = {};
 								std::snprintf(buffer,sizeof(buffer) - 1,"Couldn't load file \"%s\".",except.file_path());
 								platform->error_message_box(buffer);
 							}
+							
 							catch(...) { throw; }
+							
 						}
 						if(platform->was_key_pressed(Keycode::B)) {
 							tiles[0 * (Background_Tile_Count_X * 2) + 0] = Tile{11,std::uint32_t(-1)};
@@ -927,6 +998,14 @@ namespace core {
 				renderer->draw_text({Background_Tile_Count_X / 2.0f - rect.width / 2.0f,7.0f},{0.5f,0.5f},{1,1,1},"Press 'Enter' to advance to the next stage.");
 				break;
 			}
+			case Scene::Level_Selection: {
+				render_map();
+				for (std::size_t i = 0; i < Map_Options_Count; i += 1) {
+					auto rect = renderer->compute_text_dims({ 0,0,1 }, { 0.25f,0.25f }, Map_Options[i]);
+					Vec3 color = (current_map_option == i) ? Vec3{1, 1, 0} : Vec3{ 1,1,1 };
+					renderer->draw_text({ Background_Tile_Count_X / 2.0f - rect.width / 2.0f,Map_First_Option_Y_Offset + float(i) * 0.5f,1 }, { 0.25f,0.25f }, color, Map_Options[i]);
+				}
+			}
 			case Scene::Construction: {
 				if(!construction_choosing_tile) {
 					render_map();
@@ -1020,6 +1099,7 @@ namespace core {
 			}
 			file << "\n";
 		}
+		return;
 	}
 
 	void Game::load_map(const char* file_path) {
@@ -1046,5 +1126,51 @@ namespace core {
 				renderer->draw_sprite({0.25f + x * 0.5f,0.25f + y * 0.5f,core::tile_flag_to_z_order(tile_template.flag)},{0.5f,0.5f},tile_template.rotation,tiles_texture,tile_template.tile_layer_index);
 			}
 		}
+	}
+	void Game::load_map_from_drive() {
+		OPENFILENAMEA ofn;
+		char fileName[MAX_PATH] = {};
+		char filePath[MAX_PATH] = {};
+		ZeroMemory(&ofn, sizeof(ofn));
+
+		ofn.lStructSize = sizeof(ofn);
+		ofn.lpstrFile = filePath;
+		ofn.lpstrFile[0] = '\0';
+		ofn.nMaxFile = sizeof(filePath) - 1;
+		ofn.lpstrFilter = "All Files (*.*)\0*.*\0";
+		ofn.nFilterIndex = 1;
+		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+		if (GetOpenFileNameA(&ofn))
+		{
+			load_map(filePath);
+		}
+		return;
+		////wprintf(L"No file selected.\n");
+	}	
+	void Game::save_map_on_drive() {
+		OPENFILENAMEA ofn;       // Structure for the save file dialog
+		TCHAR szFile[MAX_PATH]; // Buffer to store the selected file name
+
+		// Initialize the OPENFILENAME structure
+		ZeroMemory(&ofn, sizeof(ofn));
+		ofn.lStructSize = sizeof(ofn);
+		ofn.hwndOwner = NULL;
+		ofn.lpstrFile = szFile;
+		ofn.lpstrFile[0] = '\0';
+		ofn.nMaxFile = sizeof(szFile)-1;
+		ofn.lpstrFilter = "Map (*.txt)\0*.txt\0All Files (*.*)\0*.*\0";
+		ofn.nFilterIndex = 1;
+		ofn.lpstrFileTitle = NULL;
+		ofn.nMaxFileTitle = 0;
+		ofn.lpstrInitialDir = NULL;
+		ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+
+		// Display the Save File dialog
+		if (GetSaveFileNameA(&ofn) == TRUE)
+		{
+			save_map(szFile);	
+		}
+		return;
 	}
 }
